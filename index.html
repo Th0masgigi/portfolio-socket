@@ -8,6 +8,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* Registered so the per-project background tint fades instead of jumping */
+  @property --tint { syntax: "<color>"; inherits: true; initial-value: #808080; }
+  @property --tint-on { syntax: "<number>"; inherits: true; initial-value: 0; }
+  @property --wash { syntax: "<percentage>"; inherits: true; initial-value: 12%; }
   :root {
     --bezel: #050505;
     --screen: #d9d9d9;
@@ -27,8 +31,10 @@
     --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
     --sans: "Manrope", system-ui, -apple-system, sans-serif;
     --cart-w: clamp(150px, 30vw, 300px);
+    --wash: 12%; /* how strongly the selected project's tint washes the screen */
   }
   [data-screen="dark"] {
+    --wash: 8%;
     --screen: #1c1c1e;
     --screen-edge: #0f0f10;
     --dot: rgba(255, 255, 255, 0.09);
@@ -65,13 +71,16 @@
     max-width: 1400px; max-height: 860px;
     border-radius: clamp(14px, 2.4vw, 28px);
     overflow: hidden;
+    --mix: calc(var(--wash) * var(--tint-on));
+    --screen-tinted: color-mix(in oklab, var(--screen), var(--tint) var(--mix));
+    --edge-tinted: color-mix(in oklab, var(--screen-edge), var(--tint) var(--mix));
     background:
-      radial-gradient(ellipse at 50% 45%, transparent 40%, var(--screen-edge) 120%),
+      radial-gradient(ellipse at 50% 45%, transparent 40%, var(--edge-tinted) 120%),
       radial-gradient(var(--dot) 1.2px, transparent 1.6px) 0 0 / 18px 18px,
-      var(--screen);
+      var(--screen-tinted);
     display: grid;
     grid-template-rows: auto 1fr auto;
-    transition: background-color .4s;
+    transition: --tint .6s ease, --tint-on .6s ease, --wash .4s ease;
     user-select: none; -webkit-user-select: none;
   }
 
@@ -400,6 +409,41 @@
     return c.length > 1 ? `linear-gradient(135deg,${c.join(",")})` : c[0];
   };
 
+  /* ---------- Background tint ----------
+     cartridge.tint: "#rrggbb" = custom, "none" = no tint, missing = match the label
+     (the average of its label colours, or of its label image). */
+  const hexRGB = (h) => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const rgbHex = (rgb) => "#" + rgb.map((x) => Math.round(x).toString(16).padStart(2, "0")).join("");
+  const avgHex = (hexes) => rgbHex([0, 1, 2].map((k) => hexes.reduce((s, h) => s + hexRGB(h)[k], 0) / hexes.length));
+  // Average an image's colour, weighting saturated pixels so greys and whites don't wash it out.
+  const imageTint = (src) => new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const S = 24, cv = document.createElement("canvas"); cv.width = cv.height = S;
+        const g = cv.getContext("2d", { willReadFrequently: true });
+        g.drawImage(img, 0, 0, S, S);
+        const d = g.getImageData(0, 0, S, S).data, sum = [0, 0, 0];
+        let wt = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+          const w = 0.05 + (mx - mn) / 255;
+          sum[0] += d[i] * w; sum[1] += d[i + 1] * w; sum[2] += d[i + 2] * w; wt += w;
+        }
+        res(rgbHex(sum.map((x) => x / wt)));
+      } catch (e) { res(null); }
+    };
+    img.onerror = () => res(null);
+    img.src = src;
+  });
+  const HEX6 = /^#[0-9a-f]{6}$/i;
+  function tintFor(p) {
+    if (p.tint === "none") return Promise.resolve(null);
+    if (HEX6.test(p.tint || "")) return Promise.resolve(p.tint);
+    if (p.img) return imageTint(p.img);
+    return Promise.resolve(p.label?.colors?.length ? avgHex(p.label.colors) : null);
+  }
+
   window.LAUNCHER_READY = (async () => {
   const PROJECTS = await loadCartridges();
 
@@ -435,6 +479,16 @@
     return slot;
   });
   const dots = PROJECTS.map(() => { const d = document.createElement("i"); $("dots").appendChild(d); return d; });
+
+  const tints = PROJECTS.map(tintFor);
+  function applyTint() {
+    const i = index;
+    tints[i].then((t) => {
+      if (i !== index) return; // moved on before an image tint finished
+      if (t) screen.style.setProperty("--tint", t);
+      screen.style.setProperty("--tint-on", t ? 1 : 0);
+    });
+  }
 
   function offsetFor(i) {
     let o = i - index;
@@ -479,6 +533,7 @@
     caption.classList.add("swap");
     setTimeout(() => { captionText.textContent = PROJECTS[index].title; caption.classList.remove("swap"); }, 140);
     try { sessionStorage.setItem("cart", index); } catch (e) {}
+    applyTint();
   }
 
   function go(i) {
