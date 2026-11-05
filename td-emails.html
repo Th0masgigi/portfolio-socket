@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TD Emails — Thomas Gibson-Gamache</title>
+  <meta name="description" content="Case study: a multi-brand email design system for TD Bank's servicing, transactional, and notification emails.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --fg: #f2f2f2;
+      --muted: #8a8a8a;
+      --line: rgba(255, 255, 255, 0.08);
+      --rule: rgba(255, 255, 255, 0.14);
+      --outline: rgba(255, 255, 255, 0.25);
+      --accent: #7ef29a;
+      /* TD Emails card palette, carried through the case study */
+      --paper: #12341c;
+      --ink: #c9f5d3;
+      --shade: #0b2412;
+      --max: 1120px;
+      --gutter: clamp(16px, 5vw, 64px);
+      --sans: "Manrope", system-ui, -apple-system, sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--fg);
+      font-family: var(--sans); line-height: 1.5;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    img, video { display: block; max-width: 100%; }
+    .wrap { max-width: var(--max); margin: 0 auto; padding-left: var(--gutter); padding-right: var(--gutter); }
+    .mono { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+    /* Background grid lines */
+    .grid-bg {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter);
+      display: grid; grid-template-columns: repeat(8, 1fr);
+    }
+    .grid-bg span { border-left: 1px solid var(--line); }
+    .grid-bg span:last-child { border-right: 1px solid var(--line); }
+    @media (max-width: 700px) {
+      .grid-bg { grid-template-columns: repeat(4, 1fr); }
+      .grid-bg span:nth-child(n+5) { display: none; }
+      .grid-bg span:nth-child(4) { border-right: 1px solid var(--line); }
+    }
+    main, header, footer { position: relative; z-index: 1; }
+
+    /* Header */
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(10, 10, 10, 0.75);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 64px; border-bottom: 1px solid var(--rule); }
+    .logo { display: inline-flex; color: var(--fg); transition: opacity .2s; }
+    .logo:hover { opacity: .7; }
+    .logo svg { display: block; width: 40px; height: auto; }
+    .nav ul { display: flex; gap: clamp(16px, 4vw, 44px); list-style: none; }
+    .nav ul a { color: var(--muted); font-size: 15px; transition: color .2s; }
+    .nav ul a:hover { color: var(--fg); }
+    .nav ul a.cta { color: var(--accent); }
+    @media (max-width: 640px) { .nav li:not(:last-child) { display: none; } }
+
+    /* Shared section pieces */
+    section { padding: 112px 0; }
+    .label { font-size: 15px; color: var(--muted); margin-bottom: 32px; }
+    .label b { color: var(--accent); font-weight: 500; }
+    h2 {
+      font-size: clamp(32px, 5vw, 60px); font-weight: 500; letter-spacing: -0.04em; line-height: 1.05;
+      max-width: 20ch; text-wrap: balance;
+    }
+    .lede {
+      font-size: clamp(20px, 2.4vw, 28px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.3;
+      max-width: 34ch; color: var(--fg);
+    }
+    .lede em { font-style: normal; color: var(--muted); }
+    .body { color: var(--muted); max-width: 62ch; font-size: 16px; }
+    .stack { display: grid; gap: 28px; }
+
+    /* Hero */
+    .crumbs { display: flex; justify-content: space-between; gap: 16px; padding-top: 12px; color: var(--muted); }
+    .crumbs a:hover { color: var(--fg); }
+    .hero { padding: 72px 0 40px; display: grid; gap: 28px; }
+    .hero .eyebrow { color: var(--accent); }
+    .hero h1 {
+      font-size: clamp(44px, 8vw, 104px); font-weight: 500; letter-spacing: -0.05em; line-height: 0.98;
+      text-wrap: balance; max-width: 14ch;
+    }
+    .hero p { max-width: 54ch; color: var(--muted); font-size: clamp(17px, 1.6vw, 20px); }
+
+    .hero-image { background: var(--paper); padding: clamp(12px, 2vw, 24px); }
+    .hero-image img { width: 100%; height: auto; }
+
+    .facts {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); margin-top: 40px;
+    }
+    .facts div { padding: 20px 20px 22px 0; display: grid; gap: 6px; min-width: 0; }
+    .facts div + div { padding-left: 20px; border-left: 1px solid var(--rule); }
+    .facts dt { color: var(--muted); }
+    .facts dd { font-size: 17px; font-weight: 500; letter-spacing: -0.01em; }
+    @media (max-width: 760px) {
+      .facts { grid-template-columns: 1fr 1fr; }
+      .facts div:nth-child(3) { padding-left: 0; border-left: 0; }
+      .facts div:nth-child(n+3) { border-top: 1px solid var(--rule); }
+    }
+
+    /* Problem */
+    .problems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 48px; }
+    .problem { border: 1px solid var(--rule); padding: 24px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+    .problem h3 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+    .problem p { color: var(--muted); }
+    .problem .tag { color: var(--accent); }
+    @media (max-width: 860px) { .problems { grid-template-columns: 1fr; } }
+
+    /* Before collage */
+    .before { margin-top: 56px; }
+    .before-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 16px; color: var(--muted); }
+    .collage {
+      columns: 4 180px; column-gap: 12px;
+      background: #141414; padding: 12px; border: 1px solid var(--rule);
+    }
+    .collage img {
+      width: 100%; height: auto; margin-bottom: 12px; break-inside: avoid;
+      filter: grayscale(.35); transition: filter .3s;
+    }
+    .collage img:hover { filter: none; }
+
+    /* Solution */
+    .solution { background: var(--paper); color: var(--ink); }
+    .solution .label { color: color-mix(in srgb, var(--ink) 70%, transparent); }
+    .solution .label b { color: var(--ink); }
+    .solution .lede em { color: color-mix(in srgb, var(--ink) 65%, transparent); }
+    .pillars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 56px; border-top: 1px solid currentColor; }
+    .pillar { padding: 24px 24px 0 0; display: grid; gap: 12px; align-content: start; min-width: 0; }
+    .pillar + .pillar { padding-left: 24px; border-left: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); }
+    .pillar h3 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; }
+    .pillar p { opacity: .8; }
+    @media (max-width: 860px) {
+      .pillars { grid-template-columns: 1fr; }
+      .pillar, .pillar + .pillar { padding: 24px 0; border-left: 0; }
+      .pillar + .pillar { border-top: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); }
+    }
+
+    /* Process: a real sequence with a revisions loop */
+    .process { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 0; margin-top: 56px; }
+    .steps { list-style: none; display: grid; gap: 0; counter-reset: step; }
+    .step {
+      counter-increment: step; position: relative;
+      display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 20px; align-items: baseline;
+      padding: 24px 0; border-top: 1px solid var(--rule);
+    }
+    .step:last-child { border-bottom: 1px solid var(--rule); }
+    .step::before { content: counter(step, decimal-leading-zero); font-family: var(--mono); font-size: 12px; color: var(--accent); }
+    .step h3 { font-size: clamp(20px, 2.4vw, 28px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.15; }
+    .step p { color: var(--muted); margin-top: 6px; max-width: 56ch; }
+    .loop { position: relative; }
+    .loop svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .loop span {
+      position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+      writing-mode: vertical-rl; color: var(--accent);
+    }
+    @media (max-width: 640px) {
+      .process { grid-template-columns: 1fr; }
+      .loop { display: none; }
+      .loop-note { display: block !important; }
+    }
+    .loop-note { display: none; margin-top: 16px; color: var(--accent); }
+
+    /* Outcomes anatomy */
+    .anatomy { display: grid; gap: 12px; margin-top: 56px; }
+    .part {
+      display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0;
+      border: 1px solid var(--rule);
+    }
+    .part figure { background: #fff; display: grid; place-items: center; padding: 0; min-width: 0; }
+    .part figure img { width: 100%; height: auto; }
+    .part .copy { padding: 24px; display: grid; gap: 10px; align-content: center; min-width: 0; border-left: 1px solid var(--rule); }
+    .part .copy .mono { color: var(--accent); }
+    .part .copy h3 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+    .part .copy p { color: var(--muted); }
+    @media (max-width: 760px) {
+      .part { grid-template-columns: 1fr; }
+      .part .copy { border-left: 0; border-top: 1px solid var(--rule); }
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .chips span { border: 1px solid var(--outline); border-radius: 999px; padding: 2px 10px; font-size: 13px; color: var(--fg); }
+
+    /* Fluid design */
+    .fluid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 64px); align-items: center; }
+    .fluid .video { background: var(--paper); padding: clamp(12px, 2vw, 24px); }
+    .fluid video { width: 100%; height: auto; }
+    .fluid .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+    .fluid .compare div { border: 1px solid var(--rule); padding: 14px; display: grid; gap: 4px; }
+    .fluid .compare b { font-weight: 500; }
+    .fluid .compare .chosen { border-color: var(--accent); }
+    .fluid .compare .chosen .mono { color: var(--accent); }
+    .fluid .compare .mono { color: var(--muted); }
+    @media (max-width: 860px) { .fluid { grid-template-columns: 1fr; } }
+
+    /* CTA */
+    .cta-block { border-top: 1px solid var(--rule); }
+    .cta-block h2 { max-width: 16ch; }
+    .cta-block h2 a { color: var(--accent); border-bottom: 2px solid currentColor; }
+    .btns { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 40px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 22px; border: 1px solid var(--outline); border-radius: 999px;
+      font-size: 15px; transition: background .2s, color .2s;
+    }
+    .btn:hover { background: var(--fg); color: var(--bg); }
+
+    footer { border-top: 1px solid var(--rule); padding: 28px 0 40px; }
+    .foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; color: var(--muted); }
+    .foot ul { display: flex; gap: 24px; list-style: none; }
+    .foot a:hover { color: var(--fg); }
+
+    @media (max-width: 640px) { section { padding: 80px 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+
+  <header>
+    <nav class="wrap nav">
+      <a href="index.html" class="logo" aria-label="Thomas Gibson-Gamache, home">
+        <svg width="50" height="33" viewBox="0 0 50 33" fill="none" aria-hidden="true"><path d="M12 18.4414L12 25.2354L8 25.2354L8 18.4414L6.36374e-07 18.4414L8.06097e-07 14.5586L8 14.5586L8 7.76465L12 7.76465L12 14.5586L20 14.5586L20 18.4414L12 18.4414ZM27 11.6475L27 21.3525L35 21.3525L35 25.2354L27 25.2354L27 33L23 33L23 25.2354L15 25.2354L15 21.3525L23 21.3525L23 11.6475L15 11.6475L15 7.76465L23 7.76465L23 1.00537e-06L27 1.18021e-06L27 7.76465L35 7.76465L35 11.6475L27 11.6475ZM42 18.4414L42 25.2354L38 25.2354L38 18.4414L30 18.4414L30 14.5586L38 14.5586L38 7.76465L42 7.76465L42 14.5586L50 14.5586L50 18.4414L42 18.4414Z" fill="currentColor"/></svg>
+      </a>
+      <ul>
+        <li><a href="index.html#work">work</a></li>
+        <li><a href="index.html#about">about</a></li>
+        <li><a href="index.html#contact" class="cta">contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div class="crumbs mono">
+        <a href="index.html#work">← selected works</a>
+        <span>2023 · Design System</span>
+      </div>
+
+      <div class="hero">
+        <span class="eyebrow mono">TD Bank · Operational comms</span>
+        <h1>Making TD's servicing emails feel like one bank</h1>
+        <p>A multi-brand email design system for the servicing, transactional, and notification emails that land in TD customers' inboxes every day.</p>
+      </div>
+
+      <figure class="hero-image">
+        <img src="images/td/hero.png" width="2048" height="859" alt="A spread of redesigned TD Bank, TD Insurance and MBNA servicing emails built from the new system">
+      </figure>
+
+      <dl class="facts">
+        <div><dt class="mono">Role</dt><dd>Lead designer</dd></div>
+        <div><dt class="mono">Work done</dt><dd>UX, UI, design research</dd></div>
+        <div><dt class="mono">Timeline</dt><dd>3 months</dd></div>
+        <div><dt class="mono">Brands</dt><dd>TD CA, TD US, MBNA, Wealth</dd></div>
+      </dl>
+    </div>
+
+    <section class="wrap" id="overview">
+      <p class="label"><b>.</b>overview</p>
+      <div class="stack">
+        <p class="lede">Servicing, transactional, and notification emails are essential touchpoints in the customer journey. <em>They deliver account information, transaction notifications, and account updates.</em></p>
+        <p class="body">My day-to-day work focused on turning a fragmented set of messages into one consistent brand and user experience, so TD clients could trust every email they received.</p>
+      </div>
+    </section>
+
+    <section class="wrap" id="problem" style="padding-top:0">
+      <p class="label"><b>.</b>the problem</p>
+      <h2>Four brands, built in silos, and customers could tell</h2>
+
+      <div class="problems">
+        <article class="problem">
+          <span class="tag mono">Fragmentation</span>
+          <h3>Inconsistent everything</h3>
+          <p>Four primary brands (TD CA, TD US, MBNA and Wealth) operated in silos with inconsistent styles, branding and tone.</p>
+        </article>
+        <article class="problem">
+          <span class="tag mono">Efficiency loss</span>
+          <h3>Rebuilt from scratch</h3>
+          <p>Teams were rebuilding emails from scratch each time, creating massive production drag.</p>
+        </article>
+        <article class="problem">
+          <span class="tag mono">Low customer trust</span>
+          <h3>Did TD really send this?</h3>
+          <p>Inconsistent branding and formatting raised legitimacy and security concerns for customers.</p>
+        </article>
+      </div>
+
+      <div class="before">
+        <div class="before-head mono"><span>Before: a sample of emails in use across the bank</span><span>7 examples</span></div>
+        <div class="collage">
+          <img src="images/td/before-1.png" width="622" height="920" alt="Existing TD email before the redesign" loading="lazy">
+          <img src="images/td/before-2.png" width="774" height="404" alt="Existing TD email before the redesign" loading="lazy">
+          <img src="images/td/before-3.png" width="326" height="920" alt="Existing TD email before the redesign" loading="lazy">
+          <img src="images/td/before-5.png" width="502" height="868" alt="Existing TD email before the redesign" loading="lazy">
+          <img src="images/td/before-6.png" width="774" height="575" alt="Existing TD email before the redesign" loading="lazy">
+          <img src="images/td/before-4.png" width="214" height="971" alt="Existing TD email before the redesign" loading="lazy">
+          <img src="images/td/before-7.png" width="506" height="723" alt="Existing TD email before the redesign" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <section class="solution" id="solution">
+      <div class="wrap">
+        <p class="label"><b>.</b>proposed solution</p>
+        <p class="lede" style="max-width:30ch">A multi-brand email design system for all of TD Bank's email communications, <em>built on the same foundational layouts.</em></p>
+
+        <div class="pillars">
+          <div class="pillar">
+            <span class="mono">Library</span>
+            <h3>Modular email components</h3>
+            <p>Reusable headers, footers, buttons and content blocks that can be assembled into any operational email while keeping the brand consistent.</p>
+          </div>
+          <div class="pillar">
+            <span class="mono">Templates</span>
+            <h3>Standardized templates</h3>
+            <p>Templates for each email type (notifications, statements, alerts and more) that follow consistent visual patterns while leaving room for flexible content.</p>
+          </div>
+          <div class="pillar">
+            <span class="mono">Adoption</span>
+            <h3>Educational workshops</h3>
+            <p>Training sessions with content designers, project managers and developers on how to structure emails as part of their working process.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap" id="process">
+      <p class="label"><b>.</b>design process</p>
+      <h2>Audit, simplify, template, test, and repeat</h2>
+
+      <div class="process">
+        <ol class="steps">
+          <li class="step"><div><h3>Visual audit</h3><p>Audited the emails in use across the bank to see how email was actually being used.</p></div></li>
+          <li class="step" id="step-foundations"><div><h3>Design foundations</h3><p>Created a simplified version of the existing TD design system to limit the variation seen in email.</p></div></li>
+          <li class="step"><div><h3>Templates</h3><p>Established catch-all templates for frequently used and recurring notifications.</p></div></li>
+          <li class="step" id="step-test"><div><h3>Test</h3><p>Checked where the foundations and templates were working and where the team still had gaps.</p></div></li>
+        </ol>
+        <div class="loop" aria-hidden="true">
+          <svg id="loop-svg"></svg>
+          <span class="mono">revisions</span>
+        </div>
+      </div>
+      <p class="loop-note mono">↺ Test fed revisions back into the foundations</p>
+    </section>
+
+    <section class="wrap" id="outcomes" style="padding-top:0">
+      <p class="label"><b>.</b>outcomes</p>
+      <div class="stack">
+        <h2>One anatomy for every operational email</h2>
+        <p class="body">For MVP1 we delivered a comprehensive email design system to serve as the foundation for all TD Bank email communications. It included the most frequently used templates, plus flexibility within the system for more complex use cases.</p>
+      </div>
+
+      <div class="anatomy">
+        <div class="part">
+          <figure><img src="images/td/anatomy-header.png" width="1200" height="230" alt="Email header with the TD logo and a green brand bar" loading="lazy"></figure>
+          <div class="copy"><span class="mono">01 · Header</span><h3>Email header</h3><p>Shows which area of the bank the email is coming from.</p></div>
+        </div>
+        <div class="part">
+          <figure><img src="images/td/anatomy-body.png" width="1208" height="852" alt="Email body with heading, subheading, paragraphs and a link" loading="lazy"></figure>
+          <div class="copy">
+            <span class="mono">02 · Body</span><h3>Email body</h3>
+            <p>The primary area where designers have control and flexibility. Depending on the use case, it can hold:</p>
+            <div class="chips"><span>Headlines</span><span>Icons</span><span>Paragraphs</span><span>Links</span><span>Images</span><span>Data tables</span><span>CTA buttons</span></div>
+          </div>
+        </div>
+        <div class="part">
+          <figure><img src="images/td/anatomy-footer.png" width="1208" height="258" alt="Email footer with contact, privacy and legal links" loading="lazy"></figure>
+          <div class="copy"><span class="mono">03 · Footer</span><h3>Footer section</h3><p>Optional links that mirror the footer of each brand's website.</p></div>
+        </div>
+        <div class="part">
+          <figure><img src="images/td/anatomy-legal.png" width="1208" height="534" alt="Legal disclaimer block in small print" loading="lazy"></figure>
+          <div class="copy"><span class="mono">04 · Legal</span><h3>Legal section</h3><p>Space for all the extra legal fluff we're legally obligated to add.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap" id="fluid" style="padding-top:0">
+      <div class="fluid">
+        <div class="video">
+          <video src="images/td/fluid-design.mp4" autoplay muted loop playsinline aria-label="An email template resizing fluidly from wide to narrow"></video>
+        </div>
+        <div class="stack">
+          <p class="label" style="margin:0"><b>.</b>fluid design</p>
+          <h2 style="font-size:clamp(28px,3.6vw,44px)">Fluid over responsive</h2>
+          <p class="body">When updating the email design strategy, we chose a fluid design approach over traditional responsive design. The decision was driven by practical resource constraints and a focus on production efficiency.</p>
+          <div class="compare">
+            <div><span class="mono">Considered</span><b>Responsive</b></div>
+            <div class="chosen"><span class="mono">Chosen</span><b>Fluid</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap cta-block" id="more">
+      <p class="label"><b>.</b>want to learn more?</p>
+      <h2>This shows the polished result. <a href="https://www.linkedin.com/in/tgibsongamache/" target="_blank" rel="noopener">Ask me about the rest.</a></h2>
+      <p class="body" style="margin-top:24px">I'd love to walk you through the failed prototypes, the stakeholder trade-offs, and how we ended up here.</p>
+      <div class="btns">
+        <a href="https://www.linkedin.com/in/tgibsongamache/" target="_blank" rel="noopener" class="btn">message me on LinkedIn ↗</a>
+        <a href="index.html#work" class="btn">← back to selected works</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot mono">
+      <span>© 2026 Thomas Gibson-Gamache</span>
+      <ul>
+        <li><a href="https://www.linkedin.com/in/tgibsongamache/" target="_blank" rel="noopener">linkedin</a></li>
+        <li><a href="https://www.instagram.com/gigi.psd" target="_blank" rel="noopener">instagram</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script>
+    // Draw the revisions loop from "Test" back up to "Design foundations"
+    (function () {
+      const svg = document.getElementById('loop-svg');
+      const from = document.getElementById('step-test');
+      const to = document.getElementById('step-foundations');
+      if (!svg || !from || !to) return;
+      function draw() {
+        const box = svg.getBoundingClientRect();
+        if (!box.width) return;
+        const y1 = from.getBoundingClientRect().top + from.offsetHeight / 2 - box.top;
+        const y2 = to.getBoundingClientRect().top + to.offsetHeight / 2 - box.top;
+        const x = box.width - 28;
+        svg.innerHTML =
+          '<path d="M0 ' + y1 + ' H' + x + ' V' + y2 + ' H8" fill="none" stroke="#7ef29a" stroke-width="1.2"/>' +
+          '<path d="M14 ' + (y2 - 6) + ' L8 ' + y2 + ' L14 ' + (y2 + 6) + '" fill="none" stroke="#7ef29a" stroke-width="1.2"/>';
+      }
+      draw();
+      window.addEventListener('resize', draw);
+      if (document.fonts) document.fonts.ready.then(draw);
+    })();
+
+    // Respect reduced motion for the looping video
+    (function () {
+      const v = document.querySelector('.fluid video');
+      if (v && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        v.removeAttribute('autoplay'); v.pause(); v.controls = true;
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Cartridge Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #d9d9d9; --dot: rgba(0,0,0,.12); --panel: #f4f4f4; --ink: #111; --muted: #6b6b6b;
+    --line: rgba(0,0,0,.1); --pill: #111; --pill-fg: #f2f2f2; --accent: #2f9e57; --danger: #c4352b;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --sans: "Manrope", system-ui, -apple-system, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e; --dot: rgba(255,255,255,.08); --panel: #262628; --ink: #f2f2f2; --muted: #9a9a9a;
+      --line: rgba(255,255,255,.1); --pill: #f2f2f2; --pill-fg: #111; --accent: #7ef29a; --danger: #ff7a6e;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(var(--dot) 1.2px, transparent 1.6px) 0 0 / 18px 18px, var(--bg);
+    color: var(--ink); font-family: var(--mono); font-size: 13px; -webkit-font-smoothing: antialiased;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  a { color: inherit; }
+  code { font-family: var(--mono); font-size: 12px; }
+
+  /* ---------- Top bar ---------- */
+  .bar {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 12px 16px;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .bar h1 { font-size: 13px; font-weight: 600; margin-right: auto; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px;
+    border-radius: 8px; background: var(--pill); color: var(--pill-fg);
+    font-size: 12px; font-weight: 500; white-space: nowrap; text-decoration: none;
+  }
+  .pill.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  .pill.danger { background: transparent; color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent); }
+  .pill:disabled { opacity: .4; cursor: default; }
+  .status { font-size: 12px; color: var(--muted); }
+  .status.ok { color: var(--accent); }
+  .status.err { color: var(--danger); }
+  .mode { font-size: 11px; padding: 3px 8px; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
+  .mode.live { color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent); }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 22px 16px 80px; }
+  .intro { color: var(--muted); max-width: 72ch; line-height: 1.6; margin-bottom: 18px; font-family: var(--sans); font-size: 14px; }
+  .notice {
+    margin-bottom: 18px; padding: 14px 16px; border-radius: 10px; background: var(--panel);
+    font-family: var(--sans); font-size: 14px; line-height: 1.55;
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .notice.warn { box-shadow: inset 3px 0 0 var(--danger); }
+  .notice .pill { margin-top: 10px; }
+
+  /* ---------- Cards ---------- */
+  .list { display: grid; gap: 14px; }
+  .card {
+    display: grid; grid-template-columns: 240px 1fr; gap: 22px; align-items: start;
+    padding: 18px; border-radius: 12px;
+    background: var(--panel); box-shadow: 0 1px 0 var(--line), 0 8px 24px rgba(0,0,0,.06);
+  }
+  @media (max-width: 760px) { .card { grid-template-columns: 1fr; } }
+  .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 11px; color: var(--muted); }
+  .tools { display: flex; gap: 4px; }
+  .tools button {
+    width: 28px; height: 28px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line);
+    display: inline-grid; place-items: center; font-size: 13px;
+  }
+  .tools button:disabled { opacity: .3; cursor: default; }
+  .tools button.del:hover { color: var(--danger); }
+  .badge { display: inline-block; margin-top: 10px; font-size: 11px; padding: 3px 8px; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
+  .badge.lock { color: var(--ink); }
+
+  /* Mini cartridge preview (same label well as the 3D model) */
+  .cart {
+    --plastic: #3b3b3e;
+    position: relative; aspect-ratio: 1.62 / 1; width: 100%;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--plastic) 82%, #fff), var(--plastic) 16%, var(--plastic) 72%, color-mix(in srgb, var(--plastic) 75%, #000));
+    clip-path: polygon(6.5% 0, 93% 0, 93% 2.5%, 100% 9%, 100% 96%, 98.5% 100%, 1.5% 100%, 0 96%, 0 11%);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,.14), inset 0 -5px 0 rgba(0,0,0,.28);
+  }
+  .cart::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 20%; background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(0,0,0,.2)); }
+  .cart .label {
+    position: absolute; left: 14.5%; right: 14.5%; top: 24%; bottom: 13%;
+    border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 2px rgba(0,0,0,.35);
+    display: flex; flex-direction: column; justify-content: space-between; padding: 6% 7%; font-family: var(--sans);
+  }
+  .cart .label img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cart .label .s { font-family: var(--mono); font-size: 8px; opacity: .75; position: relative; }
+  .cart .label .t { font-weight: 600; font-size: 17px; letter-spacing: -.02em; line-height: 1.05; position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cart .label .tag { position: absolute; left: 6%; bottom: 8%; padding: 1px 5px; border-radius: 3px; background: rgba(0,0,0,.65); color: #fff; font-family: var(--mono); font-size: 8px; }
+
+  /* ---------- Fields ---------- */
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+  @media (max-width: 520px) { .fields { grid-template-columns: 1fr; } }
+  .field { display: grid; gap: 6px; align-content: start; }
+  .field.wide { grid-column: 1 / -1; }
+  .field > span, .group-title { font-size: 11px; color: var(--muted); letter-spacing: .02em; }
+  .group-title { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid var(--line); margin-top: 2px; }
+  input[type=text], input[type=password], select, textarea {
+    min-height: 34px; padding: 7px 10px; border-radius: 7px;
+    background: var(--bg); border: 1px solid var(--line); outline: none; width: 100%;
+  }
+  textarea { resize: vertical; min-height: 64px; font-family: var(--sans); font-size: 14px; line-height: 1.45; }
+  input:focus, select:focus, textarea:focus { border-color: var(--ink); }
+  .note { font-size: 12px; color: var(--muted); font-family: var(--sans); line-height: 1.45; }
+  .note.err { color: var(--danger); }
+  .check { display: flex; gap: 8px; align-items: flex-start; font-family: var(--sans); font-size: 13px; line-height: 1.4; }
+  .check input { margin-top: 2px; accent-color: var(--ink); }
+
+  .colours { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .swatch { position: relative; width: 34px; height: 34px; border-radius: 8px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--line), 0 0 0 1px var(--line); flex: none; }
+  .swatch input { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); border: 0; padding: 0; cursor: pointer; }
+  .hex { width: 88px !important; text-transform: lowercase; }
+
+  .seg { display: inline-flex; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--line); padding: 2px; }
+  .seg button { height: 28px; padding: 0 10px; border-radius: 5px; font-size: 12px; color: var(--muted); }
+  .seg button[aria-pressed=true] { background: var(--pill); color: var(--pill-fg); }
+
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .preset { width: 26px; height: 26px; border-radius: 6px; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
+  .preset[aria-pressed=true] { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .preset.default { background: linear-gradient(135deg, #3b3b3e 50%, #505054 50%); }
+
+  .drop {
+    display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px;
+    border: 1px dashed var(--line); background: var(--bg); cursor: pointer;
+  }
+  .drop.over { border-color: var(--ink); }
+  .drop img { width: 72px; height: 36px; object-fit: cover; border-radius: 3px; }
+  .drop input { display: none; }
+
+  .add {
+    display: grid; place-items: center; height: 64px; border-radius: 12px;
+    border: 1px dashed var(--line); color: var(--muted); font-size: 13px; width: 100%;
+  }
+  .add:hover { color: var(--ink); border-color: var(--ink); }
+
+  /* ---------- Connect dialog ---------- */
+  dialog {
+    width: min(480px, calc(100% - 32px)); border: 0; border-radius: 14px; padding: 22px;
+    background: var(--panel); color: var(--ink); margin: auto;
+    box-shadow: 0 30px 80px rgba(0,0,0,.35);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog h2 { font-family: var(--sans); font-weight: 500; font-size: 22px; letter-spacing: -.02em; margin-bottom: 8px; }
+  dialog .fields { margin: 16px 0; }
+  dialog ol { font-family: var(--sans); font-size: 13px; line-height: 1.55; color: var(--muted); padding-left: 18px; }
+  dialog .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1>Cartridge Manager</h1>
+  <span class="mode" id="mode"></span>
+  <span class="status" id="status" aria-live="polite"></span>
+  <button class="pill ghost" id="connect">Connect GitHub</button>
+  <button class="pill ghost" id="revert" disabled>Discard</button>
+  <button class="pill" id="save" disabled>Save</button>
+  <a class="pill ghost" href="index.html" target="_blank" rel="noopener">Launcher ↗</a>
+</header>
+
+<main>
+  <div id="notice"></div>
+  <p class="intro">Edit each cartridge's name, label, shell colour, Inspect text and what it opens. Add, remove and reorder cartridges below. <b>Save</b> publishes everything at once.</p>
+  <div class="list" id="list"></div>
+  <p style="margin-top:14px"><button class="add" id="add">+ Add cartridge</button></p>
+</main>
+
+<dialog id="gh">
+  <form method="dialog" id="gh-form">
+    <h2>Connect GitHub</h2>
+    <p class="note">Saving from the live site commits your changes to the site's GitHub repo, and GitHub Pages republishes in about a minute. The token is your key: it stays in this browser only.</p>
+    <div class="fields">
+      <label class="field"><span>Repository</span><input type="text" id="gh-repo" placeholder="owner/name" spellcheck="false"></label>
+      <label class="field"><span>Branch</span><input type="text" id="gh-branch" placeholder="main" spellcheck="false"></label>
+      <label class="field wide"><span>Access token</span><input type="password" id="gh-token" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <ol>
+      <li>On GitHub: Settings → Developer settings → Fine-grained tokens → Generate new token.</li>
+      <li>Repository access: <b>Only select repositories</b> → this repo.</li>
+      <li>Permissions → Repository → <b>Contents: Read and write</b>. Nothing else.</li>
+    </ol>
+    <p class="note err" id="gh-err" style="margin-top:10px"></p>
+    <div class="row" style="margin-top:14px">
+      <button class="pill danger" id="gh-signout" type="button">Sign out</button>
+      <button class="pill ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="pill" id="gh-ok" type="submit">Connect</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+  import { b64, encryptText, decryptText, bundlePage } from "./protect.js";
+
+  const $ = (id) => document.getElementById(id);
+  const HEX = /^#[0-9a-f]{6}$/i;
+  const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  const SHELLS = [
+    ["Default grey", null], ["Charcoal", "#1f1f22"], ["Silver", "#a7a9ad"], ["Ruby", "#b3262e"],
+    ["Sapphire", "#2849a8"], ["Emerald", "#1f8a4c"], ["Gold", "#c9a227"], ["Clear purple", "#6b4fa8"], ["White", "#e9e9ea"],
+  ];
+  const OPENS = [
+    ["page", "Case study page"],
+    ["protected", "Password-protected case study"],
+    ["soon", "Coming soon (no link yet)"],
+    ["about", "About panel"],
+    ["contact", "Contact panel"],
+  ];
+  const PAGES = ["td-emails.html"]; // suggestions for the page field
+
+  /* =========================================================
+     Storage backends
+     ========================================================= */
+  const GH_KEY = "socket:github";
+  const ghConfig = () => { try { return JSON.parse(localStorage.getItem(GH_KEY)) || null; } catch { return null; } };
+  const defaultRepo = () => {
+    // On GitHub Pages (owner.github.io/repo/) we can guess the repo
+    const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    if (m) return `${m[1]}/${location.pathname.split("/").filter(Boolean)[0] || m[1] + ".github.io"}`;
+    return "Th0masgigi/portfolio-socket";
+  };
+
+  function github(cfg) {
+    const [owner, repo] = cfg.repo.split("/");
+    const api = async (path, opts = {}) => {
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
+        ...opts,
+        headers: {
+          Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28", ...(opts.body ? { "content-type": "application/json" } : {}), ...opts.headers,
+        },
+      });
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({}))).message || res.statusText;
+        throw new Error(res.status === 401 ? "GitHub rejected the token. Reconnect with a valid token." : `GitHub: ${msg}`);
+      }
+      return res.status === 204 ? null : res.headers.get("content-type")?.includes("json") ? res.json() : res.text();
+    };
+    return {
+      label: `GitHub · ${cfg.repo}`,
+      live: true,
+      async check() {
+        const r = await api("");
+        if (!r.permissions?.push) throw new Error("This token can't write to that repo. Give it Contents: Read and write.");
+      },
+      async readJSON(path) {
+        const text = await api(`/contents/${path}?ref=${encodeURIComponent(cfg.branch)}`, { headers: { Accept: "application/vnd.github.raw+json" } });
+        return typeof text === "string" ? JSON.parse(text) : text;
+      },
+      // One commit for all files: blobs → tree → commit → move the branch
+      async commit(files, message) {
+        const ref = await api(`/git/ref/heads/${cfg.branch}`);
+        const head = await api(`/git/commits/${ref.object.sha}`);
+        const tree = [];
+        for (const f of files) {
+          if (f.content == null) { tree.push({ path: f.path, mode: "100644", type: "blob", sha: null }); continue; }
+          const blob = await api("/git/blobs", { method: "POST", body: JSON.stringify({ content: f.content, encoding: "base64" }) });
+          tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
+        }
+        const t = await api("/git/trees", { method: "POST", body: JSON.stringify({ base_tree: head.tree.sha, tree }) });
+        const c = await api("/git/commits", { method: "POST", body: JSON.stringify({ message, tree: t.sha, parents: [head.sha] }) });
+        await api(`/git/refs/heads/${cfg.branch}`, { method: "PATCH", body: JSON.stringify({ sha: c.sha }) });
+      },
+    };
+  }
+
+  const localServer = {
+    label: "This computer",
+    live: false,
+    async readJSON(path) { return (await fetch(path, { cache: "no-store" })).json(); },
+    async commit(files) {
+      const res = await fetch("/api/commit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ files }) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || (res.status === 404 || res.status === 405 ? "This server can't save. Run node server.js, or connect GitHub." : `HTTP ${res.status}`));
+    },
+  };
+
+  const readOnly = {
+    label: "Read-only",
+    live: false,
+    readOnly: true,
+    async readJSON(path) { return (await fetch(path, { cache: "no-store" })).json(); },
+    async commit() { throw new Error("Connect GitHub to save."); },
+  };
+
+  let backend;
+  function pickBackend() {
+    const cfg = ghConfig();
+    backend = cfg?.token ? github(cfg) : LOCAL ? localServer : readOnly;
+    $("mode").textContent = backend.label;
+    $("mode").className = "mode" + (backend.live ? " live" : "");
+    $("connect").textContent = cfg?.token ? "GitHub ✓" : "Connect GitHub";
+    $("notice").innerHTML = backend.readOnly
+      ? `<div class="notice warn">You're viewing the cartridges read-only. <b>Connect GitHub</b> to edit and publish from here.</div>`
+      : !backend.live
+        ? `<div class="notice">Saving to <b>this computer</b> (needs <code>node server.js</code>). Changes go live when the repo is pushed, or connect GitHub to publish directly.</div>`
+        : "";
+  }
+
+  /* =========================================================
+     State
+     ========================================================= */
+  let saved = [];      // as last loaded/saved
+  let data = [];       // working copy (may hold _private fields)
+  const uploads = new Map(); // path → base64 for new label images
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const strip = (list) => list.map((c) => Object.fromEntries(Object.entries(c).filter(([k]) => !k.startsWith("_"))));
+  const dirty = () => JSON.stringify(strip(data)) !== JSON.stringify(saved) || data.some((c) => c._password);
+  const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "cartridge";
+  const uid = (base) => { let id = slug(base), n = 2; while (data.some((c) => c.id === id)) id = `${slug(base)}-${n++}`; return id; };
+  // What a cartridge opens: chosen in this session (_opens), else worked out from its saved fields
+  const opensOf = (c) => c._opens || (c.protected ? "protected" : c.action ? c.action : c.href ? "page" : "soon");
+
+  function setStatus(msg, kind = "") { const el = $("status"); el.textContent = msg; el.className = "status " + kind; }
+  function refreshBar() {
+    const d = dirty();
+    $("save").disabled = !d || backend.readOnly;
+    $("revert").disabled = !d;
+    if (d) setStatus("Unsaved changes");
+  }
+
+  async function load() {
+    setStatus("Loading…");
+    try {
+      const json = await backend.readJSON("cartridges.json");
+      saved = json.cartridges.map((c) => ({ ...c, id: c.id || slug(c.title), label: c.label || { colors: ["#222222"], fg: "#ffffff" } }));
+      data = clone(saved);
+      uploads.clear();
+      render();
+      setStatus("");
+    } catch (e) {
+      setStatus(e.message || "Couldn't load cartridges.json", "err");
+    }
+  }
+
+  /* =========================================================
+     Rendering
+     ========================================================= */
+  const labelBg = (c) => { const k = c.label?.colors?.length ? c.label.colors : ["#222222"]; return k.length > 1 ? `linear-gradient(135deg,${k.join(",")})` : k[0]; };
+  function previewHTML(c) {
+    const shell = c.shell ? `style="--plastic:${c.shell}"` : "";
+    const src = c._preview || c.img;
+    const inner = src
+      ? `<img src="${esc(src)}" alt=""><span class="tag">${esc(c.category).toUpperCase()}</span>`
+      : `<span class="s">${esc(c.year)} · ${esc(c.category)}</span><span class="t">${esc(c.title)}</span><span class="s">TGG</span>`;
+    const lbl = src ? "" : `style="background:${labelBg(c)};color:${c.label?.fg || "#fff"}"`;
+    return `<div class="cart" ${shell}><div class="label" ${lbl}>${inner}</div></div>`;
+  }
+  const colourInput = (path, value, label) => `
+    <span class="swatch" title="${label}"><input type="color" data-path="${path}" value="${value}" aria-label="${label}"></span>
+    <input type="text" class="hex" data-path="${path}" value="${value}" maxlength="7" aria-label="${label} hex" spellcheck="false">`;
+
+  function cardHTML(c, i) {
+    const opens = opensOf(c);
+    const usesImage = !!(c.img || c._preview);
+
+    const labelFields = `
+      <div class="field wide">
+        <span class="seg" role="group" aria-label="Label type" style="justify-self:start">
+          <button type="button" data-act="label-colour" aria-pressed="${!usesImage}">Colour</button>
+          <button type="button" data-act="label-image" aria-pressed="${usesImage}">Image</button>
+        </span>
+      </div>
+      ${usesImage ? `
+        <div class="field wide">
+          <label class="drop" data-drop>
+            <img src="${esc(c._preview || c.img)}" alt="">
+            <span class="note">Drop an image here or <u>choose a file</u>. It's resized to 1600px and saved with the site.</span>
+            <input type="file" accept="image/*" data-act="upload">
+          </label>
+        </div>` : `
+        <div class="field wide"><span>Label colours</span>
+          <div class="colours">
+            <span class="seg" role="group" aria-label="Label style">
+              <button type="button" data-act="solid" aria-pressed="${c.label.colors.length === 1}">Solid</button>
+              <button type="button" data-act="gradient" aria-pressed="${c.label.colors.length === 2}">Gradient</button>
+            </span>
+            ${c.label.colors.map((col, k) => colourInput(`label.colors.${k}`, col, k ? "Gradient end" : c.label.colors.length > 1 ? "Gradient start" : "Label colour")).join("")}
+          </div>
+        </div>
+        <div class="field"><span>Text colour</span><div class="colours">${colourInput("label.fg", c.label.fg, "Text colour")}</div></div>
+        <div class="field"><span>&nbsp;</span>
+          <label class="drop" data-drop style="padding:6px 10px"><span class="note">…or drop an image</span><input type="file" accept="image/*" data-act="upload"></label>
+        </div>`}`;
+
+    const pageOptions = `<datalist id="pages">${PAGES.map((p) => `<option value="${p}">`).join("")}</datalist>`;
+    let openFields = "";
+    if (opens === "page") {
+      openFields = `<label class="field wide"><span>Page or URL it opens</span><input type="text" data-path="href" value="${esc(c.href || "")}" list="pages" placeholder="td-emails.html" spellcheck="false">${pageOptions}</label>`;
+    } else if (opens === "protected") {
+      const locked = !!c.protected;
+      openFields = `
+        ${locked ? `<p class="note wide field">🔒 Locked with a password. The encrypted copy is <code>${esc(c.protected)}</code>.</p>` : ""}
+        <label class="field wide"><span>${locked ? "Re-encrypt from page (only if the original page still exists)" : "Page to protect"}</span>
+          <input type="text" data-path="_source" value="${esc(c._source ?? c.protectSource ?? c.href ?? "")}" list="pages" placeholder="td-emails.html" spellcheck="false">${pageOptions}</label>
+        <label class="field"><span>${locked ? "New password (leave empty to keep)" : "Password visitors will need"}</span>
+          <input type="password" data-path="_password" value="${esc(c._password || "")}" autocomplete="new-password" placeholder="8+ characters"></label>
+        ${locked ? `<label class="field"><span>Current password (to change it without the page)</span><input type="password" data-path="_current" value="${esc(c._current || "")}" autocomplete="off"></label>` : `<span></span>`}
+        <label class="check wide field"><input type="checkbox" data-path="_removeSource" ${c._removeSource !== false ? "checked" : ""}>
+          <span>Remove the unprotected page and its images from the site when saving, so only the encrypted copy is public. Older versions stay in the repo's history.</span></label>`;
+    }
+
+    return `
+      <article class="card" data-i="${i}">
+        <div>
+          <div class="head">
+            <span>Cartridge ${i + 1}</span>
+            <span class="tools">
+              <button type="button" data-act="up" ${i === 0 ? "disabled" : ""} aria-label="Move up" title="Move up">↑</button>
+              <button type="button" data-act="down" ${i === data.length - 1 ? "disabled" : ""} aria-label="Move down" title="Move down">↓</button>
+              <button type="button" class="del" data-act="delete" ${data.length === 1 ? "disabled" : ""} aria-label="Delete cartridge" title="Delete">✕</button>
+            </span>
+          </div>
+          <div class="preview">${previewHTML(c)}</div>
+          ${opens === "protected" ? `<span class="badge lock">🔒 Password protected</span>` : ""}
+        </div>
+        <div class="fields">
+          <label class="field wide"><span>Name</span><input type="text" data-path="title" value="${esc(c.title)}" maxlength="60"></label>
+          <label class="field"><span>Year</span><input type="text" data-path="year" value="${esc(c.year)}" maxlength="20"></label>
+          <label class="field"><span>Category</span><input type="text" data-path="category" value="${esc(c.category)}" maxlength="30"></label>
+
+          <div class="group-title">Label</div>
+          ${labelFields}
+
+          <div class="group-title">Shell</div>
+          <div class="field wide">
+            <div class="colours">
+              <span class="presets">${SHELLS.map(([name, hex]) => `<button type="button" class="preset${hex ? "" : " default"}" style="${hex ? `--c:${hex}` : ""}" data-shell="${hex ?? ""}" aria-pressed="${(c.shell ?? null) === hex}" title="${name}" aria-label="${name}"></button>`).join("")}</span>
+              ${colourInput("shell", c.shell || "#3b3b3e", "Custom shell colour")}
+            </div>
+          </div>
+
+          <div class="group-title">Opens</div>
+          <label class="field wide"><span>When selected</span>
+            <select data-act="opens">${OPENS.map(([v, l]) => `<option value="${v}" ${v === opens ? "selected" : ""}>${l}</option>`).join("")}</select>
+          </label>
+          ${openFields}
+
+          ${opens === "about" || opens === "contact" ? "" : `
+          <div class="group-title">Inspect panel</div>
+          <label class="field wide"><span>Summary</span><textarea data-path="summary" maxlength="400">${esc(c.summary || "")}</textarea></label>
+          <label class="field wide"><span>Role</span><input type="text" data-path="role" value="${esc(c.role || "")}" maxlength="120"></label>`}
+        </div>
+      </article>`;
+  }
+
+  function render() {
+    $("list").innerHTML = data.map(cardHTML).join("");
+    refreshBar();
+  }
+  function rerenderCard(i) {
+    const focusPath = document.activeElement?.dataset?.path;
+    document.querySelector(`.card[data-i="${i}"]`).outerHTML = cardHTML(data[i], i);
+    if (focusPath) document.querySelector(`.card[data-i="${i}"] [data-path="${focusPath}"]`)?.focus();
+    refreshBar();
+  }
+  const updatePreview = (i) => { document.querySelector(`.card[data-i="${i}"] .preview`).innerHTML = previewHTML(data[i]); refreshBar(); };
+
+  /* =========================================================
+     Editing
+     ========================================================= */
+  function setPath(obj, path, val) {
+    const keys = path.split(".");
+    let o = obj;
+    keys.slice(0, -1).forEach((k) => (o = o[k]));
+    o[keys.at(-1)] = val;
+  }
+
+  $("list").addEventListener("input", (e) => {
+    const card = e.target.closest(".card"); if (!card) return;
+    const i = +card.dataset.i, path = e.target.dataset.path; if (!path) return;
+    let v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    if (e.target.classList.contains("hex") || e.target.type === "color") {
+      if (!v.startsWith("#")) v = "#" + v;
+      if (!HEX.test(v)) return;
+      v = v.toLowerCase();
+      card.querySelectorAll(`[data-path="${path}"]`).forEach((el) => { if (el !== e.target) el.value = v; });
+    }
+    setPath(data[i], path, v);
+    if (path === "shell") card.querySelectorAll(".preset").forEach((b) => b.setAttribute("aria-pressed", b.dataset.shell === v));
+    updatePreview(i);
+  });
+
+  $("list").addEventListener("change", (e) => {
+    const card = e.target.closest(".card"); if (!card) return;
+    const i = +card.dataset.i, c = data[i];
+    if (e.target.dataset.act === "opens") {
+      const v = e.target.value;
+      c._opens = v;
+      const prevHref = c.href || c._source || c.protectSource || "";
+      delete c.action; delete c.href;
+      if (v === "about" || v === "contact") c.action = v;
+      if (v === "page") c.href = prevHref;
+      if (v === "protected") { c._source = c._source ?? prevHref; }
+      else { delete c.protected; delete c.protectSource; delete c._password; delete c._source; }
+      rerenderCard(i);
+    }
+    if (e.target.dataset.act === "upload" && e.target.files[0]) addImage(i, e.target.files[0]);
+  });
+
+  $("list").addEventListener("click", (e) => {
+    const card = e.target.closest(".card"); if (!card) return;
+    const btn = e.target.closest("button"); if (!btn) return;
+    const i = +card.dataset.i, c = data[i];
+    const act = btn.dataset.act;
+    if (act === "solid" && c.label.colors.length === 2) { c.label.colors = [c.label.colors[0]]; rerenderCard(i); }
+    if (act === "gradient" && c.label.colors.length === 1) { c.label.colors = [c.label.colors[0], shade(c.label.colors[0])]; rerenderCard(i); }
+    if (act === "label-colour") { delete c.img; delete c._preview; rerenderCard(i); }
+    if (act === "label-image" && !c.img && !c._preview) card.querySelector('input[type=file]')?.click();
+    if ("shell" in btn.dataset) { c.shell = btn.dataset.shell || null; rerenderCard(i); }
+    if (act === "up" && i > 0) { [data[i - 1], data[i]] = [data[i], data[i - 1]]; render(); }
+    if (act === "down" && i < data.length - 1) { [data[i + 1], data[i]] = [data[i], data[i + 1]]; render(); }
+    if (act === "delete" && confirm(`Delete “${c.title}”? It's removed from the site when you save.`)) { data.splice(i, 1); render(); }
+  });
+
+  // Drag-and-drop images onto a card's drop zone
+  $("list").addEventListener("dragover", (e) => { const d = e.target.closest("[data-drop]"); if (d) { e.preventDefault(); d.classList.add("over"); } });
+  $("list").addEventListener("dragleave", (e) => e.target.closest("[data-drop]")?.classList.remove("over"));
+  $("list").addEventListener("drop", (e) => {
+    const d = e.target.closest("[data-drop]"); if (!d) return;
+    e.preventDefault(); d.classList.remove("over");
+    const f = [...e.dataTransfer.files].find((x) => x.type.startsWith("image/"));
+    if (f) addImage(+d.closest(".card").dataset.i, f);
+  });
+
+  async function addImage(i, file) {
+    try {
+      const { dataUrl, base64 } = await resize(file, 1600);
+      const c = data[i];
+      const path = `images/cartridges/${c.id}-${Date.now().toString(36)}.jpg`;
+      uploads.set(path, base64);
+      c.img = path; c._preview = dataUrl;
+      rerenderCard(i);
+    } catch { setStatus("Couldn't read that image", "err"); }
+  }
+  function resize(file, max) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, max / img.naturalWidth);
+        const cv = document.createElement("canvas");
+        cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+        const g = cv.getContext("2d");
+        g.fillStyle = "#000"; g.fillRect(0, 0, cv.width, cv.height);
+        g.drawImage(img, 0, 0, cv.width, cv.height);
+        const dataUrl = cv.toDataURL("image/jpeg", 0.86);
+        URL.revokeObjectURL(img.src);
+        res({ dataUrl, base64: dataUrl.split(",")[1] });
+      };
+      img.onerror = rej;
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  function shade(hex) {
+    const n = parseInt(hex.slice(1), 16), mix = (x) => Math.round(x + (255 - x) * 0.35);
+    return "#" + [mix(n >> 16), mix((n >> 8) & 255), mix(n & 255)].map((x) => x.toString(16).padStart(2, "0")).join("");
+  }
+
+  $("add").onclick = () => {
+    data.push({
+      id: uid("new-cartridge"), title: "New cartridge", year: String(new Date().getFullYear()), category: "Category",
+      label: { colors: ["#ff6b3d", "#ffb23d"], fg: "#1a1a1a" }, shell: null,
+      summary: "", role: "",
+    });
+    render();
+    document.querySelector(`.card[data-i="${data.length - 1}"]`).scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  /* =========================================================
+     Save
+     ========================================================= */
+  const textB64 = (s) => b64.from(new TextEncoder().encode(s));
+
+  function validate() {
+    for (const [i, c] of data.entries()) {
+      const name = `Cartridge ${i + 1}`;
+      if (!c.title?.trim()) return `${name}: add a name`;
+      if (c.shell && !HEX.test(c.shell)) return `${name}: shell colour isn't a valid #rrggbb`;
+      if (opensOf(c) === "protected") {
+        if (!c.protected && !c._password) return `${name}: set a password`;
+        if (c._password && c._password.length < 8) return `${name}: use a password of at least 8 characters`;
+        if (!c.protected && !c._source) return `${name}: choose the page to protect`;
+      }
+    }
+    return null;
+  }
+
+  async function buildFiles() {
+    const files = [];
+    const removed = new Set();
+
+    for (const c of data) {
+      if (opensOf(c) !== "protected" || !c._password) continue;
+      setStatus(`Encrypting “${c.title}”…`);
+      let html = null, assets = [];
+      const src = c._source || c.protectSource;
+      if (src) {
+        try { ({ html, assets } = await bundleWithAssets(src)); } catch { html = null; }
+      }
+      if (!html && c.protected) {
+        if (!c._current) throw new Error(`“${c.title}”: the original page is gone, so enter the current password to change it.`);
+        try { html = await decryptText(await backend.readJSON(c.protected), c._current); }
+        catch { throw new Error(`“${c.title}”: the current password isn't right.`); }
+      }
+      if (!html) throw new Error(`“${c.title}”: couldn't load ${src || "the page"} to protect it.`);
+      const box = { title: c.title, ...(await encryptText(html, c._password)) };
+      const path = `protected/${c.id}.json`;
+      files.push({ path, content: textB64(JSON.stringify(box)) });
+      if (c.protected && c.protected !== path) removed.add(c.protected);
+      c.protected = path;
+      if (src) c.protectSource = src;
+      if (c._removeSource !== false && src && !/^https?:/i.test(src)) {
+        [src, ...assets].forEach((p) => removed.add(p));
+        delete c.protectSource;
+      }
+    }
+
+    // Images and encrypted pages no cartridge uses any more
+    const stillUsed = new Set(data.flatMap((c) => [c.img, c.protected]).filter(Boolean));
+    for (const c of saved) {
+      if (c.img?.startsWith("images/cartridges/") && !stillUsed.has(c.img)) removed.add(c.img);
+      if (c.protected && !stillUsed.has(c.protected)) removed.add(c.protected);
+    }
+    for (const [path, content] of uploads) if (stillUsed.has(path)) files.push({ path, content });
+    // Don't delete anything another cartridge still points at (e.g. a shared label image)
+    removed.forEach((p) => { if (!stillUsed.has(p) && !data.some((c) => c.href === p)) files.push({ path: p, content: null }); });
+
+    files.push({ path: "cartridges.json", content: textB64(JSON.stringify({ cartridges: strip(data) }, null, 2) + "\n") });
+    return files;
+  }
+
+  // Same as bundlePage, but also reports which same-site files the page used
+  async function bundleWithAssets(href) {
+    const pageUrl = new URL(href, location.href);
+    const res = await fetch(pageUrl, { cache: "no-store" });
+    if (!res.ok) throw new Error("missing");
+    const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+    const root = new URL(".", location.href);
+    const assets = [...doc.querySelectorAll("img[src], video[src], source[src], audio[src], video[poster]")]
+      .flatMap((el) => ["src", "poster"].map((a) => el.getAttribute(a)).filter(Boolean))
+      .map((v) => new URL(v, pageUrl))
+      .filter((u) => u.origin === location.origin && u.href.startsWith(root.href))
+      .map((u) => decodeURIComponent(u.href.slice(root.href.length)))
+      .filter((p) => p.startsWith("images/") && !data.some((c) => c.img === p));
+    return { html: await bundlePage(href), assets: [...new Set(assets)] };
+  }
+
+  $("save").onclick = async () => {
+    const problem = validate();
+    if (problem) return setStatus(problem, "err");
+    $("save").disabled = true;
+    try {
+      const files = await buildFiles();
+      setStatus(backend.live ? "Publishing…" : "Saving…");
+      await backend.commit(files, `Update cartridges from admin (${data.length})`);
+      data.forEach((c) => { delete c._password; delete c._current; delete c._source; delete c._opens; });
+      saved = clone(strip(data));
+      uploads.clear();
+      render();
+      setStatus(backend.live ? "Published. The live site updates in about a minute." : "Saved. Refresh the launcher to see it.", "ok");
+    } catch (err) {
+      setStatus(err.message, "err");
+      refreshBar();
+    }
+  };
+  $("revert").onclick = () => { data = clone(saved); uploads.clear(); render(); setStatus("Changes discarded"); };
+  addEventListener("beforeunload", (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
+  addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (!$("save").disabled) $("save").click(); }
+  });
+
+  /* =========================================================
+     Connect GitHub
+     ========================================================= */
+  $("connect").onclick = () => {
+    const cfg = ghConfig() || {};
+    $("gh-repo").value = cfg.repo || defaultRepo();
+    $("gh-branch").value = cfg.branch || "main";
+    $("gh-token").value = "";
+    $("gh-token").placeholder = cfg.token ? "Saved on this device (leave empty to keep)" : "github_pat_…";
+    $("gh-signout").hidden = !cfg.token;
+    $("gh-err").textContent = "";
+    $("gh").showModal();
+  };
+  $("gh-form").addEventListener("submit", async (e) => {
+    if (e.submitter?.value === "cancel") return;
+    e.preventDefault();
+    const prev = ghConfig() || {};
+    const cfg = { repo: $("gh-repo").value.trim(), branch: $("gh-branch").value.trim() || "main", token: $("gh-token").value.trim() || prev.token };
+    if (!/^[\w.-]+\/[\w.-]+$/.test(cfg.repo)) return ($("gh-err").textContent = "Repository should look like owner/name");
+    if (!cfg.token) return ($("gh-err").textContent = "Paste an access token");
+    $("gh-ok").disabled = true; $("gh-err").textContent = "Checking…";
+    try {
+      await github(cfg).check();
+      try { localStorage.setItem(GH_KEY, JSON.stringify(cfg)); } catch {}
+      $("gh").close();
+      pickBackend(); load();
+    } catch (err) { $("gh-err").textContent = err.message; }
+    $("gh-ok").disabled = false;
+  });
+  $("gh-signout").onclick = () => {
+    try { localStorage.removeItem(GH_KEY); } catch {}
+    $("gh").close(); pickBackend(); load();
+  };
+
+  pickBackend();
+  load();
+</script>
+</body>
+</html>

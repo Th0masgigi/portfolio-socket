@@ -1,0 +1,14 @@
+{
+  "exposure": 0.52,
+  "env": 0.28,
+  "keyIntensity": 1.4,
+  "keyColor": "#ffffff",
+  "keyAz": -66,
+  "keyEl": 20,
+  "fillIntensity": 6,
+  "fillColor": "#ffffff",
+  "fillAz": 150,
+  "fillEl": 20,
+  "ambientIntensity": 0.16,
+  "ambientColor": "#ffffff"
+}

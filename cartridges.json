@@ -1,0 +1,70 @@
+{
+  "cartridges": [
+    {
+      "title": "TD Emails",
+      "year": "2023",
+      "category": "Design System",
+      "img": "images/td-emails.jpg",
+      "href": "td-emails.html",
+      "summary": "A multi-brand email design system for TD Bank's servicing, transactional, and notification emails, unifying TD CA, TD US, MBNA, and Wealth.",
+      "role": "Lead designer · UX, UI, and design research",
+      "shell": null
+    },
+    {
+      "title": "Project two",
+      "year": "Year",
+      "category": "Category",
+      "label": {
+        "colors": [
+          "#ff6b3d",
+          "#ffb23d"
+        ],
+        "fg": "#1a1a1a"
+      },
+      "summary": "Placeholder. Add a one or two sentence summary of the project, your role, and the work done.",
+      "role": "Your role",
+      "shell": null
+    },
+    {
+      "title": "Project three",
+      "year": "Year",
+      "category": "Category",
+      "label": {
+        "colors": [
+          "#3d5bff",
+          "#9b6bff"
+        ],
+        "fg": "#ffffff"
+      },
+      "summary": "Placeholder. Add a one or two sentence summary of the project, your role, and the work done.",
+      "role": "Your role",
+      "shell": null
+    },
+    {
+      "title": "About me",
+      "year": "Profile",
+      "category": "Info",
+      "label": {
+        "colors": [
+          "#7ef29a"
+        ],
+        "fg": "#0a0a0a"
+      },
+      "action": "about",
+      "shell": null
+    },
+    {
+      "title": "Say hello",
+      "year": "Contact",
+      "category": "Info",
+      "label": {
+        "colors": [
+          "#0a0a0a"
+        ],
+        "fg": "#f2f2f2"
+      },
+      "action": "contact",
+      "shell": null
+    }
+  ]
+}

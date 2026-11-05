@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Protected case study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #d9d9d9; --dot: rgba(0,0,0,.12); --card: #f4f4f4; --ink: #111; --muted: #6b6b6b; --line: rgba(0,0,0,.12); --danger: #c4352b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1c1e; --dot: rgba(255,255,255,.08); --card: #262628; --ink: #f2f2f2; --muted: #9a9a9a; --line: rgba(255,255,255,.12); --danger: #ff7a6e; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; display: grid; place-items: center; padding: 16px;
+    background: radial-gradient(var(--dot) 1.2px, transparent 1.6px) 0 0 / 18px 18px, var(--bg);
+    color: var(--ink); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13px;
+  }
+  form {
+    width: min(380px, 100%); padding: 26px; border-radius: 14px; background: var(--card);
+    box-shadow: 0 1px 0 var(--line), 0 18px 50px rgba(0,0,0,.12);
+  }
+  .meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  h1 { font-family: Manrope, system-ui, sans-serif; font-weight: 500; font-size: 28px; letter-spacing: -.03em; line-height: 1.1; margin-bottom: 8px; }
+  p { font-family: Manrope, system-ui, sans-serif; color: var(--muted); font-size: 14px; line-height: 1.5; margin-bottom: 18px; }
+  input {
+    width: 100%; height: 40px; padding: 0 12px; border-radius: 8px; font: inherit; color: inherit;
+    background: var(--bg); border: 1px solid var(--line); outline: none;
+  }
+  input:focus { border-color: var(--ink); }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  button, a.btn {
+    flex: 1; height: 38px; border-radius: 8px; border: 0; cursor: pointer; font: inherit; font-weight: 500;
+    display: inline-grid; place-items: center; text-decoration: none;
+  }
+  button { background: var(--ink); color: var(--card); }
+  a.btn { color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  .err { color: var(--danger); font-size: 12px; min-height: 1.2em; margin-top: 10px; }
+</style>
+</head>
+<body>
+<form id="form" autocomplete="off">
+  <div class="meta">Protected case study</div>
+  <h1 id="title">Enter password</h1>
+  <p>This project is under NDA. Enter the password you were given to view it.</p>
+  <input id="pw" type="password" placeholder="Password" aria-label="Password" required autofocus>
+  <div class="err" id="err" role="alert"></div>
+  <div class="row">
+    <a class="btn" href="index.html">← Back</a>
+    <button id="go" type="submit">Unlock</button>
+  </div>
+</form>
+
+<script type="module">
+  import { decryptText } from "./protect.js";
+
+  const params = new URLSearchParams(location.search);
+  const file = params.get("c") || "";
+  const $ = (id) => document.getElementById(id);
+  const err = (m) => ($("err").textContent = m);
+
+  // Only files from this site's protected/ folder
+  const valid = /^protected\/[a-z0-9._-]+\.json$/i.test(file);
+  let box = null;
+  if (!valid) err("This link is broken.");
+  else fetch(file, { cache: "no-store" })
+    .then((r) => { if (!r.ok) throw 0; return r.json(); })
+    .then((b) => { box = b; if (b.title) { $("title").textContent = b.title; document.title = `${b.title} — protected`; } })
+    .catch(() => err("This case study isn't available."));
+
+  // Remember the unlock for this tab so going back and forth doesn't re-prompt
+  const KEY = "unlock:" + file;
+
+  async function open(password) {
+    const html = await decryptText(box, password);
+    try { sessionStorage.setItem(KEY, password); } catch (e) {}
+    history.replaceState(null, "", location.href);
+    document.open(); document.write(html); document.close();
+  }
+
+  $("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!box) return;
+    $("go").disabled = true; err("");
+    try { await open($("pw").value); }
+    catch { err("That password isn't right."); $("go").disabled = false; $("pw").select(); }
+  });
+
+  // Auto-unlock if this tab already entered the password
+  (async () => {
+    let saved = null;
+    try { saved = sessionStorage.getItem(KEY); } catch (e) {}
+    if (!saved || !valid) return;
+    const wait = () => new Promise((r) => { const t = setInterval(() => { if (box) { clearInterval(t); r(); } }, 50); setTimeout(() => { clearInterval(t); r(); }, 4000); });
+    await wait();
+    if (box) open(saved).catch(() => { try { sessionStorage.removeItem(KEY); } catch (e) {} });
+  })();
+</script>
+</body>
+</html>
