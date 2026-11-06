@@ -6,8 +6,14 @@
 <title>Thomas Gibson-Gamache — Digital Designer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" crossorigin>
+<link rel="preload" href="models/gba-cartridge.stl" as="fetch" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* Registered so the per-project background tint fades instead of jumping */
+  @property --tint { syntax: "<color>"; inherits: true; initial-value: #808080; }
+  @property --tint-on { syntax: "<number>"; inherits: true; initial-value: 0; }
+  @property --wash { syntax: "<percentage>"; inherits: true; initial-value: 12%; }
   :root {
     --bezel: #050505;
     --screen: #d9d9d9;
@@ -27,8 +33,10 @@
     --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
     --sans: "Manrope", system-ui, -apple-system, sans-serif;
     --cart-w: clamp(150px, 30vw, 300px);
+    --wash: 12%; /* how strongly the selected project's tint washes the screen */
   }
   [data-screen="dark"] {
+    --wash: 8%;
     --screen: #1c1c1e;
     --screen-edge: #0f0f10;
     --dot: rgba(255, 255, 255, 0.09);
@@ -65,13 +73,16 @@
     max-width: 1400px; max-height: 860px;
     border-radius: clamp(14px, 2.4vw, 28px);
     overflow: hidden;
+    --mix: calc(var(--wash) * var(--tint-on));
+    --screen-tinted: color-mix(in oklab, var(--screen), var(--tint) var(--mix));
+    --edge-tinted: color-mix(in oklab, var(--screen-edge), var(--tint) var(--mix));
     background:
-      radial-gradient(ellipse at 50% 45%, transparent 40%, var(--screen-edge) 120%),
+      radial-gradient(ellipse at 50% 45%, transparent 40%, var(--edge-tinted) 120%),
       radial-gradient(var(--dot) 1.2px, transparent 1.6px) 0 0 / 18px 18px,
-      var(--screen);
+      var(--screen-tinted);
     display: grid;
     grid-template-rows: auto 1fr auto;
-    transition: background-color .4s;
+    transition: --tint .6s ease, --tint-on .6s ease, --wash .4s ease;
     user-select: none; -webkit-user-select: none;
   }
 
@@ -297,6 +308,53 @@
   .screen.gl .slot .shell { visibility: hidden; } /* slots stay as hitboxes + layout */
   .caption { z-index: 4; }
 
+  /* ---------- Loader: shown until the 3D cartridges are ready ---------- */
+  .track, .caption, .dots { transition: opacity .5s; }
+  .screen.loading .track, .screen.loading .caption, .screen.loading .dots { opacity: 0; pointer-events: none; }
+  .loader {
+    position: absolute; left: 50%; top: 44%; z-index: 5;
+    transform: translate(-50%, -50%);
+    display: grid; justify-items: center; gap: 18px;
+    color: var(--pill-bg);
+    opacity: 0; visibility: hidden; transition: opacity .4s, visibility 0s .4s;
+  }
+  .screen.loading .loader { opacity: 1; visibility: visible; transition: opacity .4s .15s; }
+  /* A cartridge sliding into its slot, over and over */
+  .loader .slotline { position: relative; width: 74px; height: 64px; overflow: hidden; }
+  .loader .slotline::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; border-radius: 2px;
+    background: currentColor; opacity: .85;
+  }
+  .loader .mini {
+    position: absolute; left: 9px; bottom: 4px; width: 56px; height: 44px;
+    border: 2px solid currentColor; border-bottom: 0; border-radius: 5px 9px 0 0;
+    clip-path: polygon(0 0, 82% 0, 100% 14%, 100% 100%, 0 100%);
+    animation: insert 1.6s cubic-bezier(.5,0,.2,1) infinite;
+  }
+  .loader .mini::before { /* label well */
+    content: ""; position: absolute; left: 8px; right: 8px; top: 12px; bottom: 6px;
+    border-radius: 2px; background: currentColor; opacity: .18;
+  }
+  @keyframes insert {
+    0% { transform: translateY(-64px); }
+    45%, 70% { transform: translateY(0); }
+    100% { transform: translateY(-64px); }
+  }
+  .loader .bar {
+    position: relative; width: 140px; height: 6px; border-radius: 3px; overflow: hidden;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent);
+  }
+  .loader .bar i {
+    position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--p, 0));
+    background: currentColor; transition: transform .25s ease-out;
+  }
+  .loader.indeterminate .bar i { width: 35%; transform: none; animation: sweep 1.1s ease-in-out infinite; }
+  @keyframes sweep { from { left: -35%; } to { left: 100%; } }
+  .loader .msg { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
+  @media (prefers-reduced-motion: reduce) {
+    .loader .mini, .loader.indeterminate .bar i { animation: none; }
+  }
+
   /* ---------- Angle tuner (local-only admin panel) ---------- */
   .tuner {
     position: fixed; right: 16px; top: 64px; z-index: 60;
@@ -334,7 +392,7 @@
 </head>
 <body>
 
-<main class="screen" id="screen" data-screen="light" aria-roledescription="launcher">
+<main class="screen loading" id="screen" data-screen="light" aria-roledescription="launcher" aria-busy="true">
   <h1 class="sr-only">Thomas Gibson-Gamache — digital designer. Selected works.</h1>
 
   <!-- Top bar -->
@@ -355,6 +413,11 @@
   <section class="stage" id="stage" aria-label="Selected works">
     <div class="track" id="track"></div>
     <canvas class="gl-canvas" id="gl" aria-hidden="true"></canvas>
+    <div class="loader" id="loader" role="status">
+      <div class="slotline" aria-hidden="true"><div class="mini"></div></div>
+      <div class="bar" aria-hidden="true"><i></i></div>
+      <span class="msg">Loading<span id="loader-pct"></span></span>
+    </div>
     <div class="pill caption" id="caption" aria-live="polite"><span class="key">A</span><span id="caption-text"></span></div>
     <div class="dots" id="dots" aria-hidden="true"></div>
   </section>
@@ -400,6 +463,41 @@
     return c.length > 1 ? `linear-gradient(135deg,${c.join(",")})` : c[0];
   };
 
+  /* ---------- Background tint ----------
+     cartridge.tint: "#rrggbb" = custom, "none" = no tint, missing = match the label
+     (the average of its label colours, or of its label image). */
+  const hexRGB = (h) => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const rgbHex = (rgb) => "#" + rgb.map((x) => Math.round(x).toString(16).padStart(2, "0")).join("");
+  const avgHex = (hexes) => rgbHex([0, 1, 2].map((k) => hexes.reduce((s, h) => s + hexRGB(h)[k], 0) / hexes.length));
+  // Average an image's colour, weighting saturated pixels so greys and whites don't wash it out.
+  const imageTint = (src) => new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const S = 24, cv = document.createElement("canvas"); cv.width = cv.height = S;
+        const g = cv.getContext("2d", { willReadFrequently: true });
+        g.drawImage(img, 0, 0, S, S);
+        const d = g.getImageData(0, 0, S, S).data, sum = [0, 0, 0];
+        let wt = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+          const w = 0.05 + (mx - mn) / 255;
+          sum[0] += d[i] * w; sum[1] += d[i + 1] * w; sum[2] += d[i + 2] * w; wt += w;
+        }
+        res(rgbHex(sum.map((x) => x / wt)));
+      } catch (e) { res(null); }
+    };
+    img.onerror = () => res(null);
+    img.src = src;
+  });
+  const HEX6 = /^#[0-9a-f]{6}$/i;
+  function tintFor(p) {
+    if (p.tint === "none") return Promise.resolve(null);
+    if (HEX6.test(p.tint || "")) return Promise.resolve(p.tint);
+    if (p.img) return imageTint(p.img);
+    return Promise.resolve(p.label?.colors?.length ? avgHex(p.label.colors) : null);
+  }
+
   window.LAUNCHER_READY = (async () => {
   const PROJECTS = await loadCartridges();
 
@@ -435,6 +533,16 @@
     return slot;
   });
   const dots = PROJECTS.map(() => { const d = document.createElement("i"); $("dots").appendChild(d); return d; });
+
+  const tints = PROJECTS.map(tintFor);
+  function applyTint() {
+    const i = index;
+    tints[i].then((t) => {
+      if (i !== index) return; // moved on before an image tint finished
+      if (t) screen.style.setProperty("--tint", t);
+      screen.style.setProperty("--tint-on", t ? 1 : 0);
+    });
+  }
 
   function offsetFor(i) {
     let o = i - index;
@@ -479,6 +587,7 @@
     caption.classList.add("swap");
     setTimeout(() => { captionText.textContent = PROJECTS[index].title; caption.classList.remove("swap"); }, 140);
     try { sessionStorage.setItem("cart", index); } catch (e) {}
+    applyTint();
   }
 
   function go(i) {
@@ -624,6 +733,36 @@
   render();
   return { PROJECTS, slots };
   })();
+
+  /* ---------- Loader ----------
+     The screen starts in .loading. The 3D module reports progress and calls done(true)
+     once the cartridges are drawn. If 3D fails or never arrives (no WebGL, the CDN is
+     down), the flat CSS cartridges are shown instead. */
+  window.LOADER = (() => {
+    const screen = document.getElementById("screen"), loader = document.getElementById("loader");
+    const pct = document.getElementById("loader-pct");
+    let finished = false;
+    const done = (ok) => {
+      if (finished) { if (ok) screen.classList.add("gl"); return; } // 3D arrived after the safety net
+      finished = true;
+      clearTimeout(giveUp);
+      if (ok) screen.classList.add("gl");
+      screen.classList.remove("loading");
+      screen.removeAttribute("aria-busy");
+    };
+    const progress = (p) => {
+      if (finished) return;
+      if (p == null) { loader.classList.add("indeterminate"); pct.textContent = ""; return; }
+      loader.classList.remove("indeterminate");
+      const v = Math.max(0, Math.min(1, p));
+      loader.style.setProperty("--p", v);
+      pct.textContent = ` · ${Math.round(v * 100)}%`;
+    };
+    // Safety net: never leave visitors on the loader
+    const giveUp = setTimeout(() => done(false), 20000);
+    progress(0.05);
+    return { progress, done };
+  })();
 </script>
 
 <script type="importmap">
@@ -632,7 +771,8 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<script type="module">
+<!-- If three.js can't be fetched, show the flat cartridges straight away -->
+<script type="module" onerror="window.LOADER && window.LOADER.done(false)">
   /* ---------- 3D cartridges ----------
      The DOM .slot elements keep doing layout, transitions, clicks and a11y.
      Each frame we read where each slot is and place a 3D cartridge there. */
@@ -681,7 +821,8 @@
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   } catch (e) { console.warn("WebGL unavailable, keeping CSS cartridges", e); }
 
-  if (renderer) init().catch((e) => console.warn("3D cartridges failed, keeping CSS ones", e));
+  if (!renderer) window.LOADER.done(false);
+  else init().catch((e) => { console.warn("3D cartridges failed, keeping CSS ones", e); window.LOADER.done(false); });
 
   async function init() {
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -700,7 +841,12 @@
     const camera = new THREE.PerspectiveCamera(FOV, 1, 1, 20000);
 
     // Geometry: load once, smooth curved surfaces but keep hard edges crisp.
-    let geo = await new STLLoader().loadAsync("models/gba-cartridge.stl");
+    window.LOADER.progress(0.1);
+    let geo = await new STLLoader().loadAsync("models/gba-cartridge.stl", (e) => {
+      // Compressed responses may not report a total; fall back to an indeterminate bar
+      window.LOADER.progress(e.lengthComputable && e.total ? 0.1 + 0.75 * (e.loaded / e.total) : null);
+    });
+    window.LOADER.progress(0.88);
     geo = toCreasedNormals(geo, THREE.MathUtils.degToRad(35));
     geo.computeBoundingBox();
     const c = geo.boundingBox.getCenter(new THREE.Vector3());
@@ -760,10 +906,24 @@
     const clock = new THREE.Clock();
     const PLASTIC = { light: new THREE.Color(0x3b3b3e), dark: new THREE.Color(0x505054) };
     const bg = new THREE.Color(), base = new THREE.Color();
+    // The screen's actual (tinted, mid-fade) colour. It's a color-mix(), which THREE.Color
+    // can't parse, so let a 1px canvas resolve it to rgb.
+    const probe = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    let lastCss = "", lastHex = "#d9d9d9";
+    function screenColour() {
+      const css = getComputedStyle(screenEl).backgroundColor;
+      if (css !== lastCss) {
+        lastCss = css;
+        probe.clearRect(0, 0, 1, 1); probe.fillStyle = "#d9d9d9"; probe.fillStyle = css; probe.fillRect(0, 0, 1, 1);
+        const [r, g, b] = probe.getImageData(0, 0, 1, 1).data;
+        lastHex = "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+      }
+      return lastHex;
+    }
     function frame() {
       const t = clock.getElapsedTime();
       const theme = screenEl.dataset.screen === "dark" ? "dark" : "light";
-      bg.set(getComputedStyle(screenEl).getPropertyValue("--screen").trim() || "#d9d9d9");
+      bg.set(screenColour());
 
       carts.forEach((cart, i) => {
         const slot = slots[i];
@@ -810,7 +970,8 @@
       requestAnimationFrame(frame);
     }
     frame();
-    screenEl.classList.add("gl");
+    window.LOADER.progress(1);
+    requestAnimationFrame(() => window.LOADER.done(true)); // reveal after the first 3D frame
   }
 
   /* ---------- Label art (drawn to a canvas, used as the sticker texture) ---------- */
