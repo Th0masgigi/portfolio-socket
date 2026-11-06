@@ -815,10 +815,24 @@
     const clock = new THREE.Clock();
     const PLASTIC = { light: new THREE.Color(0x3b3b3e), dark: new THREE.Color(0x505054) };
     const bg = new THREE.Color(), base = new THREE.Color();
+    // The screen's actual (tinted, mid-fade) colour. It's a color-mix(), which THREE.Color
+    // can't parse, so let a 1px canvas resolve it to rgb.
+    const probe = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    let lastCss = "", lastHex = "#d9d9d9";
+    function screenColour() {
+      const css = getComputedStyle(screenEl).backgroundColor;
+      if (css !== lastCss) {
+        lastCss = css;
+        probe.clearRect(0, 0, 1, 1); probe.fillStyle = "#d9d9d9"; probe.fillStyle = css; probe.fillRect(0, 0, 1, 1);
+        const [r, g, b] = probe.getImageData(0, 0, 1, 1).data;
+        lastHex = "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+      }
+      return lastHex;
+    }
     function frame() {
       const t = clock.getElapsedTime();
       const theme = screenEl.dataset.screen === "dark" ? "dark" : "light";
-      bg.set(getComputedStyle(screenEl).getPropertyValue("--screen").trim() || "#d9d9d9");
+      bg.set(screenColour());
 
       carts.forEach((cart, i) => {
         const slot = slots[i];
