@@ -85,6 +85,17 @@
   .badge { display: inline-block; margin-top: 10px; font-size: 11px; padding: 3px 8px; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
   .badge.lock { color: var(--ink); }
 
+  /* Preview sits on the launcher's light screen, washed with the cartridge's tint */
+  .preview {
+    --tint: transparent;
+    padding: 14px; border-radius: 10px;
+    background: color-mix(in oklab, #d9d9d9, var(--tint) 12%);
+    box-shadow: inset 0 0 0 1px var(--line);
+    transition: background .3s;
+  }
+  .tint-auto { display: inline-flex; align-items: center; gap: 8px; }
+  .tint-auto i { width: 22px; height: 22px; border-radius: 6px; background: var(--c, transparent); box-shadow: inset 0 0 0 1px var(--line); }
+
   /* Mini cartridge preview (same label well as the 3D model) */
   .cart {
     --plastic: #3b3b3e;
@@ -355,6 +366,56 @@
      Rendering
      ========================================================= */
   const labelBg = (c) => { const k = c.label?.colors?.length ? c.label.colors : ["#222222"]; return k.length > 1 ? `linear-gradient(135deg,${k.join(",")})` : k[0]; };
+  /* Background tint: "#rrggbb" = custom, "none" = no tint, missing = match the label.
+     Keep in step with tintFor() in index.html. */
+  const hexRGB = (h) => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const rgbHex = (rgb) => "#" + rgb.map((x) => Math.round(x).toString(16).padStart(2, "0")).join("");
+  const avgHex = (hexes) => rgbHex([0, 1, 2].map((k) => hexes.reduce((s, h) => s + hexRGB(h)[k], 0) / hexes.length));
+  const imageTints = new Map(); // src → Promise<hex|null>
+  function imageTint(src) {
+    if (!imageTints.has(src)) imageTints.set(src, new Promise((res) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const S = 24, cv = document.createElement("canvas"); cv.width = cv.height = S;
+          const g = cv.getContext("2d", { willReadFrequently: true });
+          g.drawImage(img, 0, 0, S, S);
+          const d = g.getImageData(0, 0, S, S).data, sum = [0, 0, 0];
+          let wt = 0;
+          for (let i = 0; i < d.length; i += 4) {
+            const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+            const w = 0.05 + (mx - mn) / 255;
+            sum[0] += d[i] * w; sum[1] += d[i + 1] * w; sum[2] += d[i + 2] * w; wt += w;
+          }
+          res(rgbHex(sum.map((x) => x / wt)));
+        } catch { res(null); }
+      };
+      img.onerror = () => res(null);
+      img.src = src;
+    }));
+    return imageTints.get(src);
+  }
+  const tintMode = (c) => (c.tint === "none" ? "none" : HEX.test(c.tint || "") ? "custom" : "auto");
+  function tintFor(c) {
+    const m = tintMode(c);
+    if (m === "none") return Promise.resolve(null);
+    if (m === "custom") return Promise.resolve(c.tint);
+    const src = c._preview || c.img;
+    if (src) return imageTint(src);
+    return Promise.resolve(c.label?.colors?.length ? avgHex(c.label.colors) : null);
+  }
+  // Paint the card's preview backdrop (and the "match label" swatch) once the tint is known
+  function paintTint(i) {
+    const c = data[i];
+    tintFor(c).then((t) => {
+      const card = document.querySelector(`.card[data-i="${i}"]`);
+      if (!card || data[i] !== c) return;
+      card.querySelector(".preview")?.style.setProperty("--tint", t || "transparent");
+      const sw = card.querySelector(".tint-auto i");
+      if (sw) { sw.style.setProperty("--c", t || "transparent"); sw.parentElement.title = t || ""; }
+    });
+  }
+
   function previewHTML(c) {
     const shell = c.shell ? `style="--plastic:${c.shell}"` : "";
     const src = c._preview || c.img;
@@ -448,6 +509,20 @@
             </div>
           </div>
 
+          <div class="group-title">Background tint</div>
+          <div class="field wide">
+            <div class="colours">
+              <span class="seg" role="group" aria-label="Background tint">
+                <button type="button" data-act="tint-auto" aria-pressed="${tintMode(c) === "auto"}">Match label</button>
+                <button type="button" data-act="tint-custom" aria-pressed="${tintMode(c) === "custom"}">Custom</button>
+                <button type="button" data-act="tint-none" aria-pressed="${tintMode(c) === "none"}">None</button>
+              </span>
+              ${tintMode(c) === "custom" ? colourInput("tint", c.tint, "Background tint") : ""}
+              ${tintMode(c) === "auto" ? `<span class="tint-auto note"><i></i>Picked from the label</span>` : ""}
+            </div>
+            <span class="note">A light wash of this colour fills the launcher screen while the cartridge is selected.</span>
+          </div>
+
           <div class="group-title">Opens</div>
           <label class="field wide"><span>When selected</span>
             <select data-act="opens">${OPENS.map(([v, l]) => `<option value="${v}" ${v === opens ? "selected" : ""}>${l}</option>`).join("")}</select>
@@ -464,15 +539,17 @@
 
   function render() {
     $("list").innerHTML = data.map(cardHTML).join("");
+    data.forEach((_, i) => paintTint(i));
     refreshBar();
   }
   function rerenderCard(i) {
     const focusPath = document.activeElement?.dataset?.path;
     document.querySelector(`.card[data-i="${i}"]`).outerHTML = cardHTML(data[i], i);
     if (focusPath) document.querySelector(`.card[data-i="${i}"] [data-path="${focusPath}"]`)?.focus();
+    paintTint(i);
     refreshBar();
   }
-  const updatePreview = (i) => { document.querySelector(`.card[data-i="${i}"] .preview`).innerHTML = previewHTML(data[i]); refreshBar(); };
+  const updatePreview = (i) => { document.querySelector(`.card[data-i="${i}"] .preview`).innerHTML = previewHTML(data[i]); paintTint(i); refreshBar(); };
 
   /* =========================================================
      Editing
@@ -525,6 +602,11 @@
     if (act === "gradient" && c.label.colors.length === 1) { c.label.colors = [c.label.colors[0], shade(c.label.colors[0])]; rerenderCard(i); }
     if (act === "label-colour") { delete c.img; delete c._preview; rerenderCard(i); }
     if (act === "label-image" && !c.img && !c._preview) card.querySelector('input[type=file]')?.click();
+    if (act === "tint-auto") { delete c.tint; rerenderCard(i); }
+    if (act === "tint-none") { c.tint = "none"; rerenderCard(i); }
+    if (act === "tint-custom" && tintMode(c) !== "custom") {
+      tintFor(c).then((t) => { c.tint = t || "#888888"; rerenderCard(i); });
+    }
     if ("shell" in btn.dataset) { c.shell = btn.dataset.shell || null; rerenderCard(i); }
     if (act === "up" && i > 0) { [data[i - 1], data[i]] = [data[i], data[i - 1]]; render(); }
     if (act === "down" && i < data.length - 1) { [data[i + 1], data[i]] = [data[i], data[i + 1]]; render(); }
@@ -594,6 +676,7 @@
       const name = `Cartridge ${i + 1}`;
       if (!c.title?.trim()) return `${name}: add a name`;
       if (c.shell && !HEX.test(c.shell)) return `${name}: shell colour isn't a valid #rrggbb`;
+      if (c.tint && c.tint !== "none" && !HEX.test(c.tint)) return `${name}: background tint isn't a valid #rrggbb`;
       if (opensOf(c) === "protected") {
         if (!c.protected && !c._password) return `${name}: set a password`;
         if (c._password && c._password.length < 8) return `${name}: use a password of at least 8 characters`;
