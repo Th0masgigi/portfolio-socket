@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Design System — Thomas Gibson-Gamache</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #d9d9d9; --dot: rgba(0,0,0,.12); --panel: #f4f4f4; --ink: #111; --muted: #6b6b6b;
+    --line: rgba(0,0,0,.1); --pill: #111; --pill-fg: #f2f2f2; --accent: #2f9e57; --danger: #c4352b;
+    --check: #e4e4e4;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --sans: "Manrope", system-ui, -apple-system, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e; --dot: rgba(255,255,255,.08); --panel: #262628; --ink: #f2f2f2; --muted: #9a9a9a;
+      --line: rgba(255,255,255,.1); --pill: #f2f2f2; --pill-fg: #111; --accent: #7ef29a; --danger: #ff7a6e;
+      --check: #333336;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(var(--dot) 1.2px, transparent 1.6px) 0 0 / 18px 18px fixed, var(--bg);
+    color: var(--ink); font-family: var(--mono); font-size: 13px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  button, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px) 80px; }
+
+  /* Top bar */
+  .bar {
+    position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 14px clamp(16px, 4vw, 40px); margin: 0 calc(-1 * clamp(16px, 4vw, 40px));
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  @media (max-width: 640px) { .bar { position: static; } }
+  .bar .brand { font-weight: 600; margin-right: auto; }
+  .bar nav { display: flex; gap: 4px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px;
+    border: 0; background: var(--pill); color: var(--pill-fg); text-decoration: none; cursor: pointer; font-size: 12px;
+  }
+  .pill.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  .pill.ghost:hover { box-shadow: inset 0 0 0 1px var(--muted); }
+  select.pill { appearance: none; padding-right: 26px; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 14px) 13px, calc(100% - 10px) 13px; background-size: 4px 4px; background-repeat: no-repeat; }
+
+  /* Hero */
+  .hero { padding: 56px 0 28px; display: grid; gap: 12px; }
+  .eyebrow { color: var(--muted); font-size: 12px; letter-spacing: .03em; }
+  h1 { font-family: var(--sans); font-weight: 500; font-size: clamp(36px, 6vw, 64px); letter-spacing: -.04em; line-height: 1; }
+  .intro { font-family: var(--sans); font-size: 15px; color: var(--muted); max-width: 66ch; line-height: 1.55; }
+  .status { font-size: 12px; color: var(--muted); min-height: 18px; }
+  .status b { color: var(--ink); font-weight: 500; }
+
+  /* Panels */
+  .panel { background: var(--panel); border-radius: 14px; padding: clamp(16px, 2.4vw, 26px); box-shadow: 0 1px 0 var(--line), 0 18px 50px rgba(0,0,0,.06); }
+  .stack { display: grid; gap: 16px; }
+  h2 { font-family: var(--sans); font-weight: 500; font-size: 24px; letter-spacing: -.025em; line-height: 1.15; }
+  h3 { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: .03em; text-transform: uppercase; display: flex; gap: 8px; align-items: baseline; margin-bottom: 12px; }
+  h3 .n { color: var(--ink); }
+  .section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 40px 0 14px; }
+  .note { font-family: var(--sans); font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* Page cards */
+  .pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .card { display: grid; gap: 10px; text-decoration: none; background: var(--panel); border-radius: 14px; padding: 18px; box-shadow: 0 1px 0 var(--line); transition: transform .15s; }
+  a.card:hover { transform: translateY(-2px); }
+  .card .path { font-size: 12px; color: var(--muted); }
+  .card .name { font-family: var(--sans); font-size: 20px; font-weight: 500; letter-spacing: -.02em; }
+  .card .role { font-family: var(--sans); font-size: 13px; color: var(--muted); }
+  .card .stats { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .card .stats b { font-weight: 600; }
+  .card .strip { display: flex; height: 10px; border-radius: 3px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+  .card .strip i { flex: 1; }
+  .card.err .stats { color: var(--danger); }
+
+  /* Typefaces */
+  .faces { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .face { display: grid; gap: 14px; }
+  .face .big { font-size: 56px; line-height: 1; letter-spacing: -.03em; }
+  .face .alpha { font-size: 15px; color: var(--muted); word-break: break-all; }
+  .face .meta { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px; box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; }
+  .tag.dim { color: var(--muted); }
+  .tag.accent { color: var(--accent); box-shadow: inset 0 0 0 1px currentColor; }
+
+  /* Swatches */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .sw { display: grid; gap: 8px; border: 0; background: none; text-align: left; cursor: pointer; padding: 0; min-width: 0; }
+  .chip {
+    height: 64px; border-radius: 10px; position: relative; overflow: hidden;
+    background: repeating-conic-gradient(var(--check) 0 25%, transparent 0 50%) 0 0 / 12px 12px;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .chip i { position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); }
+  .sw .hex { font-weight: 500; font-size: 12px; display: flex; justify-content: space-between; gap: 6px; }
+  .sw .hex span { color: var(--muted); font-weight: 400; }
+  .sw .tok { font-size: 11px; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sw .use { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sw .dots { display: flex; gap: 3px; }
+  .sw .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+  .sw .dots i.on { background: var(--ink); }
+  .sw.copied .hex { color: var(--accent); }
+
+  /* Text styles */
+  .ts-list { display: grid; }
+  .ts { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 6px 24px; padding: 16px 0; border-top: 1px solid var(--line); align-items: center; }
+  .ts:first-child { border-top: 0; padding-top: 4px; }
+  .ts .spec { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding: .12em 0; }
+  section { scroll-margin-top: 64px; }
+  .ts .meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 11px; }
+  .ts .meta dt { color: var(--muted); }
+  .ts .meta dd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ts .hidden-note { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
+  @media (max-width: 760px) { .ts { grid-template-columns: 1fr; } }
+
+  /* Tokens */
+  .tokens { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tokens th { text-align: left; font-weight: 500; color: var(--muted); padding: 0 12px 8px 0; font-size: 11px; }
+  .tokens td { padding: 8px 12px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  .tokens td:first-child { white-space: nowrap; font-weight: 500; }
+  .tokens .vars { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tokens .v { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+  .tokens .v small { color: var(--muted); }
+  .tokens .v code { overflow-wrap: anywhere; }
+  .mini { width: 14px; height: 14px; border-radius: 4px; flex: none; box-shadow: inset 0 0 0 1px var(--line); background-clip: padding-box; }
+  .table-scroll { overflow-x: auto; }
+
+  /* Per-page section */
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .page-head .path { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .grid-2 { display: grid; gap: 28px; }
+  .empty { color: var(--muted); font-family: var(--sans); font-size: 13px; }
+
+  /* Hidden probe frames */
+  #probes { position: fixed; left: -30000px; top: 0; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+  #probes iframe { border: 0; height: 900px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <span class="brand">Design system</span>
+    <nav id="jump" aria-label="Jump to"></nav>
+    <label><span class="eyebrow" style="margin-right:6px">Viewport</span>
+      <select class="pill ghost" id="vw" aria-label="Viewport width to measure at">
+        <option value="1440">Desktop · 1440</option>
+        <option value="1024">Laptop · 1024</option>
+        <option value="768">Tablet · 768</option>
+        <option value="390">Phone · 390</option>
+      </select>
+    </label>
+    <button class="pill" id="rescan" type="button">Rescan</button>
+  </div>
+
+  <header class="hero">
+    <span class="eyebrow">portfolio-socket · live audit</span>
+    <h1>Design system</h1>
+    <p class="intro">Every page on the site, with the text styles and colours it really uses. Each page is loaded in a hidden frame and measured as the browser renders it, so this stays current as the pages change. Fluid sizes (<code>clamp()</code>) are measured at the viewport you choose, in your current light or dark setting.</p>
+    <p class="status" id="status" role="status">Starting…</p>
+  </header>
+
+  <div class="section-title"><h2>Pages</h2><span class="note" id="pages-note"></span></div>
+  <div class="pages" id="pages"></div>
+
+  <div class="section-title"><h2>Typefaces</h2></div>
+  <div class="faces" id="faces"></div>
+
+  <div class="section-title"><h2>Site palette</h2><span class="note">Every colour on any page. Dots show which pages use it, in the order above. Click a swatch to copy its hex.</span></div>
+  <div class="panel"><div class="swatches" id="palette"></div></div>
+
+  <div class="section-title"><h2>Shared text styles</h2><span class="note">Styles that appear on more than one page.</span></div>
+  <div class="panel"><div class="ts-list" id="shared-ts"></div></div>
+
+  <div id="detail"></div>
+</div>
+<div id="probes" aria-hidden="true"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const slug = (p) => "p-" + p.replace(/\.html$/, "").replace(/[^a-z0-9]+/gi, "-");
+
+  // Pages that always exist; case studies are added from cartridges.json
+  const CORE = [
+    { path: "index.html", name: "Launcher", role: "Home page: the 3D cartridge carousel, plus the About and Contact sheets." },
+    { path: "locked.html", name: "Locked", role: "Password gate shown before a protected case study opens." },
+    { path: "admin.html", name: "Admin", role: "Cartridge manager for editing the launcher's content." },
+  ];
+
+  /* ---------- Colour normalising ---------- */
+  const cv = document.createElement("canvas"); cv.width = cv.height = 1;
+  const cx = cv.getContext("2d", { willReadFrequently: true });
+  const cache = new Map();
+  function toRGBA(str) {
+    if (!str) return null;
+    str = String(str).trim();
+    if (cache.has(str)) return cache.get(str);
+    let out = null;
+    const m = str.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/i);
+    if (m) {
+      const a = m[4] == null ? 1 : m[4].endsWith("%") ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+      out = [Math.round(+m[1]), Math.round(+m[2]), Math.round(+m[3]), Math.round(a * 1000) / 1000];
+    } else if (!/var\(/i.test(str) && CSS.supports("color", str)) {
+      cx.clearRect(0, 0, 1, 1); cx.fillStyle = "#000"; cx.fillStyle = str; cx.fillRect(0, 0, 1, 1);
+      const d = cx.getImageData(0, 0, 1, 1).data;
+      out = [d[0], d[1], d[2], Math.round((d[3] / 255) * 1000) / 1000];
+    }
+    cache.set(str, out);
+    return out;
+  }
+  const hex = (c) => "#" + c.slice(0, 3).map((v) => v.toString(16).padStart(2, "0")).join("");
+  const keyOf = (c) => hex(c) + (c[3] < 1 ? "/" + c[3] : "");
+  const css = (c) => `rgba(${c[0]},${c[1]},${c[2]},${c[3]})`;
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const COLOR_FN = /(?:rgba?|hsla?|color|oklab|oklch|lab|lch)\([^()]*\)|#[0-9a-f]{3,8}\b/gi;
+
+  /* ---------- Probe a page ---------- */
+  function load(path, width) {
+    return new Promise((resolve, reject) => {
+      const f = document.createElement("iframe");
+      f.style.width = width + "px";
+      f.tabIndex = -1;
+      f.title = "probe";
+      const timer = setTimeout(() => reject(new Error("Timed out loading")), 20000);
+      f.onload = async () => {
+        clearTimeout(timer);
+        try {
+          const doc = f.contentDocument;
+          if (!doc) throw new Error("Can't read this page");
+          if (doc.fonts) await Promise.race([doc.fonts.ready, new Promise((r) => setTimeout(r, 4000))]);
+          await new Promise((r) => setTimeout(r, 900)); // let scripts render dynamic content
+          resolve(f);
+        } catch (e) { reject(e); }
+      };
+      f.src = path + (path.includes("?") ? "&" : "?") + "ds-probe=" + Date.now();
+      $("probes").appendChild(f);
+    });
+  }
+
+  function selectorOf(el) {
+    let s = el.tagName.toLowerCase();
+    if (el.id) s += "#" + el.id;
+    const cls = typeof el.className === "string" ? el.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+    if (cls.length) s += "." + cls.join(".");
+    return s;
+  }
+
+  function contextLabel(selector, media) {
+    const sel = selector.replace(/\s+/g, " ").trim();
+    let base = /^(:root|html)$/i.test(sel) ? "" : sel;
+    if (media) {
+      const m = media.match(/prefers-color-scheme:\s*(dark|light)/i);
+      const med = m ? m[1] + " mode" : "@media " + media;
+      return base ? `${med} · ${base}` : med;
+    }
+    return base || "default";
+  }
+
+  function scanTokens(doc, win) {
+    const decl = [];
+    const walk = (rules, media) => {
+      for (const r of rules) {
+        if (r.selectorText && r.style) {
+          for (let i = 0; i < r.style.length; i++) {
+            const p = r.style[i];
+            if (p.startsWith("--")) decl.push({ name: p, value: r.style.getPropertyValue(p).trim(), selector: r.selectorText, media });
+          }
+        }
+        if (r.cssRules) walk(r.cssRules, r.media ? r.media.mediaText : media);
+      }
+    };
+    for (const s of doc.styleSheets) { try { walk(s.cssRules, ""); } catch (e) { /* cross-origin font CSS */ } }
+
+    // Resolve default values in the page's own context (handles var() chains)
+    const probe = doc.createElement("i");
+    probe.style.display = "none";
+    doc.body.appendChild(probe);
+    const resolve = (name) => { probe.style.color = ""; probe.style.color = `var(${name})`; return toRGBA(win.getComputedStyle(probe).color); };
+
+    const byName = new Map();
+    for (const d of decl) {
+      if (!byName.has(d.name)) byName.set(d.name, { name: d.name, variants: [] });
+      const t = byName.get(d.name);
+      const ctx = contextLabel(d.selector, d.media);
+      if (t.variants.some((v) => v.ctx === ctx && v.value === d.value)) continue;
+      let c = toRGBA(d.value);
+      if (!c && /var\(/.test(d.value) && ctx === "default") c = resolve(d.name);
+      t.variants.push({ ctx, value: d.value, color: c });
+    }
+    probe.remove();
+    const list = [...byName.values()];
+    for (const t of list) {
+      const v = t.variants.map((x) => x.value).join(" ");
+      t.kind = t.variants.some((x) => x.color) ? "colour"
+        : /font|mono|sans|serif/i.test(t.name) || /["']|monospace|sans-serif|serif/.test(v) ? "type"
+        : "other";
+    }
+    return list;
+  }
+
+  const SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|HEAD|TITLE|META|LINK)$/;
+
+  function scanPage(doc, win) {
+    const styles = new Map();
+    const colors = new Map();
+    const families = new Map();
+
+    const addColor = (str, role, visible) => {
+      const c = toRGBA(str);
+      if (!c || c[3] === 0) return;
+      const k = keyOf(c);
+      if (!colors.has(k)) colors.set(k, { key: k, rgba: c, count: 0, roles: new Map(), visible: false });
+      const e = colors.get(k);
+      e.count++; e.roles.set(role, (e.roles.get(role) || 0) + 1);
+      if (visible) e.visible = true;
+    };
+
+    const addText = (el, cs, sample, visible) => {
+      const family = cs.fontFamily.split(",")[0].replace(/["']/g, "").trim();
+      const size = parseFloat(cs.fontSize);
+      const weight = cs.fontWeight;
+      const lh = cs.lineHeight === "normal" ? "normal" : Math.round((parseFloat(cs.lineHeight) / size) * 100) / 100;
+      const ls = cs.letterSpacing === "normal" ? 0 : Math.round((parseFloat(cs.letterSpacing) / size) * 1000) / 1000;
+      const k = [family, Math.round(size * 10) / 10, weight, lh, ls, cs.textTransform, cs.fontStyle].join("|");
+      if (!styles.has(k)) styles.set(k, { key: k, family, stack: cs.fontFamily, size: Math.round(size * 10) / 10, weight, lh, ls, transform: cs.textTransform, italic: cs.fontStyle === "italic", count: 0, samples: [], where: new Map(), visible: false });
+      const s = styles.get(k);
+      s.count++;
+      if (visible) s.visible = true;
+      const clean = sample.replace(/\s+/g, " ").trim();
+      if (clean && s.samples.length < 4 && !s.samples.includes(clean)) s.samples.push(clean);
+      const sel = selectorOf(el);
+      s.where.set(sel, (s.where.get(sel) || 0) + 1);
+      if (!families.has(family)) families.set(family, { stack: cs.fontFamily, weights: new Set(), count: 0 });
+      const f = families.get(family); f.weights.add(weight); f.count++;
+    };
+
+    const all = [doc.documentElement, ...doc.querySelectorAll("body, body *")];
+    for (const el of all) {
+      if (SKIP.test(el.tagName.toUpperCase())) continue;
+      if (el.closest && el.closest("script,style,template,noscript")) continue;
+      const cs = win.getComputedStyle(el);
+      const visible = el.getClientRects().length > 0 && cs.visibility !== "hidden";
+
+      let text = "";
+      for (const n of el.childNodes) if (n.nodeType === 3) text += n.nodeValue;
+      text = text.trim();
+      const isField = /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !/^(hidden|checkbox|radio|color|file|range)$/i.test(el.type || "");
+      if (text || isField) {
+        addText(el, cs, text || el.placeholder || el.value || el.tagName.toLowerCase(), visible);
+        addColor(cs.color, "text", visible);
+      }
+      addColor(cs.backgroundColor, "background", visible);
+      if (cs.backgroundImage && cs.backgroundImage !== "none") (cs.backgroundImage.match(COLOR_FN) || []).forEach((c) => addColor(c, "gradient", visible));
+      for (const side of ["Top", "Right", "Bottom", "Left"]) {
+        if (parseFloat(cs["border" + side + "Width"]) > 0 && cs["border" + side + "Style"] !== "none") { addColor(cs["border" + side + "Color"], "border", visible); break; }
+      }
+      if (cs.boxShadow && cs.boxShadow !== "none") (cs.boxShadow.match(COLOR_FN) || []).forEach((c) => addColor(c, "shadow", visible));
+      if (el.namespaceURI === "http://www.w3.org/2000/svg") {
+        if (cs.fill && cs.fill !== "none" && !cs.fill.startsWith("url")) addColor(cs.fill, "svg", visible);
+        if (cs.stroke && cs.stroke !== "none" && !cs.stroke.startsWith("url")) addColor(cs.stroke, "svg", visible);
+      }
+    }
+
+    const tokens = scanTokens(doc, win);
+    // Map colours back to the tokens that produce them
+    for (const t of tokens) for (const v of t.variants) {
+      if (!v.color) continue;
+      const e = colors.get(keyOf(v.color));
+      if (!e) continue;
+      e.tokens = e.tokens || new Set();
+      e.tokens.add(v.ctx === "default" ? t.name : `${t.name} (${v.ctx})`);
+    }
+
+    return {
+      title: doc.title,
+      styles: [...styles.values()].sort((a, b) => b.size - a.size || b.weight - a.weight || b.count - a.count),
+      colors: [...colors.values()].sort((a, b) => b.count - a.count),
+      families,
+      tokens,
+    };
+  }
+
+  /* ---------- Rendering ---------- */
+  const fmtLH = (s) => (s.lh === "normal" ? "normal" : s.lh);
+  const fmtLS = (s) => (s.ls ? `${s.ls}em` : "0");
+  const specStyle = (s) => `font-family:${esc(s.stack)};font-size:${s.size}px;font-weight:${s.weight};line-height:${s.lh === "normal" ? "normal" : s.lh};letter-spacing:${s.ls}em;text-transform:${s.transform};font-style:${s.italic ? "italic" : "normal"}`;
+
+  function tsRow(s, extra = "") {
+    const where = [...s.where.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k}${n > 1 ? " ×" + n : ""}`).join(", ");
+    return `<div class="ts">
+      <div class="spec" style="${specStyle(s)}" title="${esc(s.samples.join(" · "))}">${esc(s.samples[0] || "Sample text")}</div>
+      <dl class="meta">
+        <dt>font</dt><dd>${esc(s.family)} ${s.weight}${s.italic ? " italic" : ""}</dd>
+        <dt>size</dt><dd>${s.size}px / ${fmtLH(s)}</dd>
+        <dt>track</dt><dd>${fmtLS(s)}${s.transform !== "none" ? " · " + esc(s.transform) : ""}</dd>
+        <dt>${extra ? "pages" : "used"}</dt><dd title="${esc(where)}">${extra || `${s.count}× · ${esc(where)}`}</dd>
+      </dl>
+      ${s.visible ? "" : `<div class="hidden-note">Hidden until opened (sheet, dialog or state).</div>`}
+    </div>`;
+  }
+
+  function swatch(c, dots) {
+    const roles = [...c.roles.entries()].sort((a, b) => b[1] - a[1]).map(([r]) => r).join(" · ");
+    const tok = c.tokens && c.tokens.size ? [...c.tokens].join(", ") : "";
+    return `<button type="button" class="sw" data-hex="${hex(c.rgba)}${c.rgba[3] < 1 ? "" : ""}" title="${esc(tok || "No token")} — click to copy">
+      <span class="chip"><i style="background:${css(c.rgba)}"></i></span>
+      <span class="hex">${hex(c.rgba)}<span>${c.rgba[3] < 1 ? Math.round(c.rgba[3] * 100) + "%" : ""}</span></span>
+      ${tok ? `<span class="tok">${esc(tok)}</span>` : `<span class="use">untokenised</span>`}
+      <span class="use">${esc(roles)} · ${c.count}×</span>
+      ${dots || ""}
+    </button>`;
+  }
+
+  function tokenTable(tokens) {
+    const groups = [["colour", "Colour tokens"], ["type", "Type tokens"], ["other", "Other tokens"]];
+    return groups.map(([k, label]) => {
+      const rows = tokens.filter((t) => t.kind === k);
+      if (!rows.length) return "";
+      return `<div><h3>${label} <span class="n">${rows.length}</span></h3><div class="table-scroll"><table class="tokens">
+        <thead><tr><th>Token</th><th>Values by context</th></tr></thead><tbody>
+        ${rows.map((t) => `<tr><td>${esc(t.name)}</td><td><div class="vars">${t.variants.map((v) => `<span class="v">${v.color ? `<span class="mini" style="background:${css(v.color)}"></span>` : ""}<code>${esc(v.value)}</code><small>${esc(v.ctx)}</small></span>`).join("")}</div></td></tr>`).join("")}
+        </tbody></table></div></div>`;
+    }).join("");
+  }
+
+  function render(pages) {
+    const ok = pages.filter((p) => p.data);
+    $("jump").innerHTML = pages.map((p) => `<a class="pill ghost" href="#${slug(p.path)}">${esc(p.name)}</a>`).join("");
+    $("pages-note").textContent = `${pages.length} pages · ${ok.length} measured`;
+
+    $("pages").innerHTML = pages.map((p) => {
+      if (!p.data) return `<div class="card err"><span class="path">/${esc(p.path)}</span><span class="name">${esc(p.name)}</span><span class="role">${esc(p.role)}</span><div class="stats">${esc(p.error || "Waiting…")}</div></div>`;
+      const top = p.data.colors.filter((c) => c.visible).slice(0, 8);
+      return `<a class="card" href="#${slug(p.path)}">
+        <span class="path">/${esc(p.path)}</span>
+        <span class="name">${esc(p.name)}</span>
+        <span class="role">${esc(p.role)}</span>
+        <span class="strip">${top.map((c) => `<i style="background:${css(c.rgba)}"></i>`).join("")}</span>
+        <span class="stats"><span><b>${p.data.styles.length}</b> text styles</span><span><b>${p.data.colors.length}</b> colours</span><span><b>${p.data.tokens.length}</b> tokens</span></span>
+      </a>`;
+    }).join("");
+
+    // Typefaces across the site
+    const faces = new Map();
+    ok.forEach((p) => p.data.families.forEach((f, name) => {
+      if (!faces.has(name)) faces.set(name, { stack: f.stack, weights: new Set(), pages: new Set(), count: 0 });
+      const e = faces.get(name); f.weights.forEach((w) => e.weights.add(w)); e.pages.add(p.name); e.count += f.count;
+    }));
+    $("faces").innerHTML = [...faces.entries()].sort((a, b) => b[1].count - a[1].count).map(([name, f]) => `
+      <div class="panel face">
+        <div class="eyebrow">${esc(name)}</div>
+        <div class="big" style="font-family:${esc(f.stack)};font-weight:500">Aa Gg 01</div>
+        <div class="alpha" style="font-family:${esc(f.stack)}">ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 → ↗ ·</div>
+        <div class="meta">
+          ${[...f.weights].sort().map((w) => `<span class="tag" style="font-family:${esc(f.stack)};font-weight:${w}">${w}</span>`).join("")}
+          ${[...f.pages].map((n) => `<span class="tag dim">${esc(n)}</span>`).join("")}
+        </div>
+        <div class="note"><code>${esc(f.stack)}</code></div>
+      </div>`).join("") || `<p class="empty">Measuring…</p>`;
+
+    // Site palette
+    const pal = new Map();
+    ok.forEach((p, i) => p.data.colors.forEach((c) => {
+      if (!pal.has(c.key)) pal.set(c.key, { ...c, count: 0, roles: new Map(), tokens: new Set(), pageIdx: new Set() });
+      const e = pal.get(c.key);
+      e.count += c.count; e.pageIdx.add(pages.indexOf(p));
+      c.roles.forEach((n, r) => e.roles.set(r, (e.roles.get(r) || 0) + n));
+      if (c.tokens) c.tokens.forEach((t) => e.tokens.add(t));
+    }));
+    const palList = [...pal.values()].sort((a, b) => (a.rgba[3] < 1) - (b.rgba[3] < 1) || lum(b.rgba) - lum(a.rgba));
+    $("palette").innerHTML = palList.map((c) => swatch(c, `<span class="dots">${pages.map((_, i) => `<i class="${c.pageIdx.has(i) ? "on" : ""}"></i>`).join("")}</span>`)).join("") || `<p class="empty">Measuring…</p>`;
+
+    // Shared text styles
+    const shared = new Map();
+    ok.forEach((p) => p.data.styles.forEach((s) => {
+      if (!shared.has(s.key)) shared.set(s.key, { ...s, where: new Map(), pages: new Set(), count: 0, samples: [...s.samples] });
+      const e = shared.get(s.key); e.pages.add(p.name); e.count += s.count; if (s.visible) e.visible = true;
+    }));
+    const sharedList = [...shared.values()].filter((s) => s.pages.size > 1).sort((a, b) => b.size - a.size || b.weight - a.weight);
+    $("shared-ts").innerHTML = sharedList.map((s) => tsRow(s, esc([...s.pages].join(", ")))).join("") || `<p class="empty">${ok.length ? "No text style is shared between pages yet." : "Measuring…"}</p>`;
+
+    // Per-page detail
+    $("detail").innerHTML = pages.map((p) => {
+      const head = `<div class="page-head"><div><h2>${esc(p.name)}</h2><div class="path">/${esc(p.path)}${p.data ? " · " + esc(p.data.title) : ""}</div></div><a class="pill ghost" href="${esc(p.path)}" target="_blank" rel="noopener">Open page ↗</a></div>`;
+      if (!p.data) return `<section id="${slug(p.path)}"><div class="section-title"></div><div class="panel stack">${head}<p class="empty">${esc(p.error || "Measuring…")}</p></div></section>`;
+      const d = p.data;
+      return `<section id="${slug(p.path)}"><div class="section-title"></div>
+        <div class="panel stack grid-2">
+          ${head}
+          ${p.path === "index.html" ? `<p class="note">The 3D cartridges are drawn in WebGL, so their shell and lighting colours aren't CSS and aren't listed here. Label colours come from <code>cartridges.json</code>.</p>` : ""}
+          <div><h3>Text styles <span class="n">${d.styles.length}</span></h3><div class="ts-list">${d.styles.map((s) => tsRow(s)).join("")}</div></div>
+          <div><h3>Colours in use <span class="n">${d.colors.length}</span></h3><div class="swatches">${d.colors.map((c) => swatch(c)).join("")}</div></div>
+          ${d.tokens.length ? tokenTable(d.tokens) : `<p class="empty">No CSS custom properties declared.</p>`}
+        </div></section>`;
+    }).join("");
+  }
+
+  // Copy hex on click
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest(".sw");
+    if (!b) return;
+    try { await navigator.clipboard.writeText(b.dataset.hex); b.classList.add("copied"); setTimeout(() => b.classList.remove("copied"), 900); } catch (err) {}
+  });
+
+  /* ---------- Run ---------- */
+  let run = 0;
+  async function scanAll() {
+    const id = ++run;
+    const width = +$("vw").value;
+    const pages = CORE.map((p) => ({ ...p }));
+    try {
+      const data = await (await fetch("cartridges.json", { cache: "no-store" })).json();
+      const studies = (data.cartridges || []).filter((c) => c.href && /^[a-z0-9._-]+\.html$/i.test(c.href) && !pages.some((p) => p.path === c.href));
+      pages.splice(1, 0, ...studies.map((c) => ({ path: c.href, name: c.title, role: `Case study${c.category ? " · " + c.category : ""}${c.year ? " · " + c.year : ""}` })));
+    } catch (e) { /* cartridges.json missing: core pages only */ }
+
+    $("probes").innerHTML = "";
+    render(pages);
+    for (let i = 0; i < pages.length; i++) {
+      if (id !== run) return;
+      const p = pages[i];
+      $("status").innerHTML = `Measuring <b>${esc(p.name)}</b> at ${width}px… (${i + 1}/${pages.length})`;
+      try {
+        const f = await load(p.path, width);
+        p.data = scanPage(f.contentDocument, f.contentWindow);
+        f.remove();
+      } catch (e) { p.error = e.message || "Couldn't measure this page"; }
+      if (id !== run) return;
+      render(pages);
+    }
+    const ok = pages.filter((p) => p.data).length;
+    $("status").innerHTML = `Measured <b>${ok}</b> of ${pages.length} pages at ${width}px · ${new Date().toLocaleTimeString()}`;
+    window.__designSystem = pages;
+  }
+
+  $("rescan").addEventListener("click", scanAll);
+  $("vw").addEventListener("change", scanAll);
+  if (location.protocol === "file:") $("status").textContent = "Open this through the site (node server.js or GitHub Pages); browsers block measuring pages opened as files.";
+  else scanAll();
+})();
+</script>
+</body>
+</html>

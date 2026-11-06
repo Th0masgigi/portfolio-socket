@@ -25,7 +25,7 @@ const ORIGINS = new Set([`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`]
 
 // Files the admin page may write / delete (mirrors WRITABLE in admin.html)
 const WRITABLE = /^(cartridges\.json|lighting\.json|images\/cartridges\/[a-z0-9._-]+|protected\/[a-z0-9._-]+\.json)$/i;
-const DELETABLE = /^(images\/[a-z0-9._\/-]+|protected\/[a-z0-9._-]+\.json|(?!index\.html$|admin\.html$|locked\.html$)[a-z0-9._-]+\.html)$/i;
+const DELETABLE = /^(images\/[a-z0-9._\/-]+|protected\/[a-z0-9._-]+\.json|(?!index\.html$|admin\.html$|locked\.html$|design-system\.html$)[a-z0-9._-]+\.html)$/i;
 
 function send(res, code, obj) {
   res.writeHead(code, { "content-type": "application/json" }).end(JSON.stringify(obj));
