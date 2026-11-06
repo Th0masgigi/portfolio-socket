@@ -329,6 +329,46 @@
   }
   .tuner .row button.ghost { background: transparent; color: #f2f2f2; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
 
+  /* ---------- Loading screen ----------
+     3×3 squares, each fading between full and 20% on its own beat (1.5s loop).
+     Grey ramp that blends into the accent toward the bottom-right corner. */
+  .loader {
+    --sq: clamp(10px, 1.3vw, 16px);
+    --ld-grey: #5c5c60;
+    --ld-accent: #2fb457; /* deeper green so it reads on the light screen */
+    position: absolute; inset: 0; z-index: 40;
+    display: grid; place-items: center;
+    background: inherit;
+    transition: opacity .45s ease, visibility 0s linear .45s;
+  }
+  [data-screen="dark"] .loader { --ld-grey: #8e8e93; --ld-accent: var(--accent); }
+  .loader.done { opacity: 0; visibility: hidden; }
+  .loader .grid {
+    display: grid; grid-template-columns: repeat(3, var(--sq)); gap: var(--sq);
+  }
+  .loader i {
+    width: var(--sq); height: var(--sq);
+    background: color-mix(in oklab, var(--ld-accent) var(--mix), var(--ld-grey));
+    animation: 1.5s linear infinite;
+  }
+  .loader i:nth-child(1) { --mix: 0%;   animation-name: ld-a; }
+  .loader i:nth-child(2) { --mix: 12%;  animation-name: ld-b; }
+  .loader i:nth-child(3) { --mix: 30%;  animation-name: ld-c; }
+  .loader i:nth-child(4) { --mix: 12%;  animation-name: ld-c; }
+  .loader i:nth-child(5) { --mix: 30%;  animation-name: ld-d; }
+  .loader i:nth-child(6) { --mix: 58%;  animation-name: ld-e; }
+  .loader i:nth-child(7) { --mix: 30%;  animation-name: ld-e; }
+  .loader i:nth-child(8) { --mix: 58%;  animation-name: ld-a; }
+  .loader i:nth-child(9) { --mix: 100%; animation-name: ld-b; }
+  @keyframes ld-a { 0%, 40% { opacity: 1; } 80% { opacity: .2; } 100% { opacity: 1; } }
+  @keyframes ld-b { 0% { opacity: 1; } 40% { opacity: .2; } 60%, 100% { opacity: 1; } }
+  @keyframes ld-c { 0% { opacity: .2; } 20% { opacity: 1; } 60%, 100% { opacity: .2; } }
+  @keyframes ld-d { 0% { opacity: 1; } 20% { opacity: .2; } 60%, 100% { opacity: 1; } }
+  @keyframes ld-e { 0%, 20% { opacity: 1; } 60% { opacity: .2; } 80%, 100% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .loader i { animation-duration: 4.5s; }
+  }
+
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
 </head>
@@ -336,6 +376,21 @@
 
 <main class="screen" id="screen" data-screen="light" aria-roledescription="launcher">
   <h1 class="sr-only">Thomas Gibson-Gamache — digital designer. Selected works.</h1>
+
+  <div class="loader" id="loader" role="status">
+    <div class="grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <span class="sr-only">Loading</span>
+  </div>
+  <script>
+    // Apply the saved screen theme before first paint so the loader doesn't flash light.
+    try {
+      const t = localStorage.getItem("screen") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.getElementById("screen").dataset.screen = t;
+    } catch (e) {}
+    // Hide the loader once the 3D cartridges are up (or failed); never hang longer than 10s.
+    window.hideLoader = () => document.getElementById("loader")?.classList.add("done");
+    setTimeout(window.hideLoader, 10000);
+  </script>
 
   <!-- Top bar -->
   <header class="top">
@@ -681,7 +736,8 @@
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   } catch (e) { console.warn("WebGL unavailable, keeping CSS cartridges", e); }
 
-  if (renderer) init().catch((e) => console.warn("3D cartridges failed, keeping CSS ones", e));
+  if (renderer) init().catch((e) => console.warn("3D cartridges failed, keeping CSS ones", e)).finally(window.hideLoader);
+  else window.hideLoader();
 
   async function init() {
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
