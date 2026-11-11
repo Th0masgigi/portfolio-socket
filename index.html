@@ -6,6 +6,13 @@
 <title>Thomas Gibson-Gamache — Digital Designer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Import map must come before any module preload/load, or Firefox-based browsers ignore it -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" crossorigin>
 <link rel="preload" href="models/gba-cartridge.stl" as="fetch" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600&family=Silkscreen&display=swap" rel="stylesheet">
@@ -784,12 +791,6 @@
   })();
 </script>
 
-<script type="importmap">
-{ "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-} }
-</script>
 <!-- If three.js can't be fetched, show the flat cartridges straight away -->
 <script type="module" onerror="window.LOADER && window.LOADER.done(false)">
   /* ---------- 3D cartridges ----------
