@@ -23,9 +23,6 @@
   @property --wash { syntax: "<percentage>"; inherits: true; initial-value: 12%; }
   :root {
     --bezel: #050505;
-    --screen: #d9d9d9;
-    --screen-edge: #b9b9b9;
-    --dot: rgba(0, 0, 0, 0.13);
     --pill-bg: #111;
     --pill-fg: #f2f2f2;
     --chip-bg: #f2f2f2;
@@ -44,9 +41,6 @@
   }
   [data-screen="dark"] {
     --wash: 8%;
-    --screen: #1c1c1e;
-    --screen-edge: #0f0f10;
-    --dot: rgba(255, 255, 255, 0.09);
     --pill-bg: #f2f2f2;
     --pill-fg: #111;
     --chip-bg: #2c2c2e;
@@ -80,17 +74,37 @@
     max-width: 1400px; max-height: 860px;
     border-radius: clamp(14px, 2.4vw, 28px);
     overflow: hidden;
+    isolation: isolate;
+    /* Background: a two-colour gradient + noise, set from background.json (see BG in the
+       script). Each theme has its own colours; the per-project tint washes both stops. */
+    --bg-a: var(--bg-a-light, #e6e6e8);
+    --bg-b: var(--bg-b-light, #c2c2c6);
     --mix: calc(var(--wash) * var(--tint-on));
-    --screen-tinted: color-mix(in oklab, var(--screen), var(--tint) var(--mix));
-    --edge-tinted: color-mix(in oklab, var(--screen-edge), var(--tint) var(--mix));
+    --a-tinted: color-mix(in oklab, var(--bg-a), var(--tint) var(--mix));
+    --b-tinted: color-mix(in oklab, var(--bg-b), var(--tint) var(--mix));
+    --screen-tinted: color-mix(in oklab, var(--a-tinted), var(--b-tinted)); /* the average, for things drawn on top */
     background:
-      radial-gradient(ellipse at 50% 45%, transparent 40%, var(--edge-tinted) 120%),
-      radial-gradient(var(--dot) 1.2px, transparent 1.6px) 0 0 / 18px 18px,
-      var(--screen-tinted);
+      radial-gradient(ellipse at 50% 45%, transparent 40%, rgb(0 0 0 / var(--vignette, .15)) 125%),
+      var(--bg-gradient, linear-gradient(160deg, var(--a-tinted), var(--b-tinted)));
+    background-color: var(--screen-tinted);
     display: grid;
     grid-template-rows: auto 1fr auto;
     transition: --tint .6s ease, --tint-on .6s ease, --wash .4s ease;
     user-select: none; -webkit-user-select: none;
+  }
+
+  .screen[data-screen="dark"] {
+    --bg-a: var(--bg-a-dark, #2a2a2e);
+    --bg-b: var(--bg-b-dark, #101012);
+  }
+  /* Film-grain noise over the gradient; the tile is drawn once by BG.noiseTile() */
+  .screen::before {
+    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-image: var(--noise-img, none);
+    background-size: calc(128px * var(--grain, 1));
+    image-rendering: pixelated;
+    opacity: var(--noise, .12);
+    mix-blend-mode: var(--noise-blend, overlay);
   }
 
   /* ---------- Pills ---------- */
@@ -387,7 +401,11 @@
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .tuner { max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; }
-  .tuner[hidden] { display: none; }
+  .tuner[hidden], .tuner [hidden] { display: none !important; }
+  .tuner select { background: #222; color: #f2f2f2; border: 1px solid rgba(255,255,255,.25); border-radius: 5px; font: inherit; padding: 2px 4px; }
+  .tuner input[type=checkbox] { accent-color: #7ef29a; width: 16px; height: 16px; }
+  .tuner .row button[aria-pressed=true] { background: #7ef29a; color: #111; }
+  .tuner .row button[aria-pressed=false] { background: transparent; color: #f2f2f2; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
   .tuner section + section { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
   .tuner h4 { font-size: 11px; font-weight: 500; opacity: .55; letter-spacing: .04em; text-transform: uppercase; margin: 12px 0 8px; }
   .tuner label.colour { grid-template-columns: 1fr auto; align-items: center; }
@@ -471,6 +489,62 @@
 <div class="iris" id="iris"></div>
 
 <script>
+  /* ---------- Background (gradient + noise) ----------
+     Settings live in background.json; the tuner panel (` key) edits them live. */
+  window.BG = (() => {
+    const screen = document.getElementById("screen");
+    const DEFAULTS = {
+      style: "linear",      // "linear" | "radial"
+      angle: 160,           // degrees, for linear
+      centerX: 50, centerY: 40, // %, for radial
+      light: { a: "#e6e6e8", b: "#c2c2c6" },
+      dark:  { a: "#2a2a2e", b: "#101012" },
+      noise: 0.12,          // 0–1 opacity of the grain
+      grain: 1,             // pixel size of each grain
+      blend: "overlay",     // how grain mixes with the gradient
+      colourNoise: false,   // false = grey grain, true = RGB grain
+      vignette: 0.15,       // 0–1 darkening at the edges
+    };
+    const settings = JSON.parse(JSON.stringify(DEFAULTS));
+    let tileKey = "";
+    function noiseTile(colour) {
+      const S = 128, cv = document.createElement("canvas"); cv.width = cv.height = S;
+      const g = cv.getContext("2d"), img = g.createImageData(S, S);
+      let seed = 1337; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 255;
+      for (let i = 0; i < img.data.length; i += 4) {
+        const v = rnd();
+        img.data[i] = v; img.data[i + 1] = colour ? rnd() : v; img.data[i + 2] = colour ? rnd() : v; img.data[i + 3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+      return cv.toDataURL("image/png");
+    }
+    function apply() {
+      const s = settings, st = screen.style;
+      st.setProperty("--bg-a-light", s.light.a); st.setProperty("--bg-b-light", s.light.b);
+      st.setProperty("--bg-a-dark", s.dark.a); st.setProperty("--bg-b-dark", s.dark.b);
+      st.setProperty("--bg-gradient", s.style === "radial"
+        ? `radial-gradient(circle at ${s.centerX}% ${s.centerY}%, var(--a-tinted), var(--b-tinted) 85%)`
+        : `linear-gradient(${s.angle}deg, var(--a-tinted), var(--b-tinted))`);
+      st.setProperty("--vignette", s.vignette);
+      st.setProperty("--noise", s.noise);
+      st.setProperty("--grain", s.grain);
+      st.setProperty("--noise-blend", s.blend);
+      const key = String(!!s.colourNoise);
+      if (key !== tileKey) { tileKey = key; st.setProperty("--noise-img", `url(${noiseTile(s.colourNoise)})`); }
+    }
+    const merge = (o) => {
+      for (const k of Object.keys(DEFAULTS)) {
+        if (o?.[k] === undefined) continue;
+        settings[k] = typeof DEFAULTS[k] === "object" ? { ...DEFAULTS[k], ...o[k] } : o[k];
+      }
+    };
+    apply();
+    const ready = fetch("background.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
+      .then((o) => { merge(o); apply(); return settings; });
+    return { settings, DEFAULTS, apply, ready, set: (o) => { merge(o); apply(); } };
+  })();
+
   /* ---------- Content ----------
      Cartridge names, colours and details live in cartridges.json.
      Edit them in admin.html (run `node server.js` to save from that page). */
@@ -828,6 +902,7 @@
   let applyLighting = () => {}; // replaced once the scene exists
   const tunerPanel = setupTuner(POSE, DEFAULT_POSE);
   if (tunerPanel) setupLightTuner(tunerPanel, LIGHT, DEFAULT_LIGHT, () => applyLighting());
+  if (tunerPanel) setupBackgroundTuner(tunerPanel);
 
   async function loadLighting() {
     try {
@@ -1039,13 +1114,15 @@
     return cv;
   }
   /* ---------- Angle tuner ----------
-     Admin-only: it exists only when the site is served from this computer
-     (localhost / 127.0.0.1), so visitors to the published site never get it.
+     Admin-only: it exists when the site is served from this computer (localhost /
+     127.0.0.1), or on the published site when the URL ends in ?tune — visitors never
+     see it otherwise. Saving needs node server.js; on the live site use "Copy JSON".
      Toggle with the ` (backtick) key. Tweaks are remembered in this browser;
      "Copy values" gives you the line to paste over DEFAULT_POSE to make it permanent. */
   function setupTuner(pose, defaults) {
     const local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
-    if (!local) return;
+    const asked = new URLSearchParams(location.search).has("tune");
+    if (!local && !asked) return;
 
     const KEY = "socket:pose";
     try { Object.assign(pose, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
@@ -1059,7 +1136,7 @@
     const deg = (r) => `${Math.round(THREE.MathUtils.radToDeg(r))}°`;
     const panel = document.createElement("aside");
     panel.className = "tuner";
-    panel.hidden = true;
+    panel.hidden = !asked; // ?tune opens it straight away
     panel.setAttribute("aria-label", "Cartridge angle tuner");
     panel.innerHTML = `
       <h3>Cartridge angle <span>\` to hide</span></h3>
@@ -1187,6 +1264,116 @@
           const out = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(out.error || `HTTP ${res.status} — is node server.js running?`);
           saved = { ...light }; sync(); say("Saved to lighting.json", "ok");
+        } catch (err) { sync(); say(err.message, "err"); }
+      }
+    });
+  }
+
+  /* ---------- Background tuner ----------
+     Same panel. Edits preview live; colours are per screen theme (the Y key or the
+     Dark/Light screen button switches which pair you're editing). "Save background"
+     writes background.json through server.js; "Copy JSON" works anywhere. */
+  async function setupBackgroundTuner(panel) {
+    const BG = window.BG, s = await BG.ready;
+    const clone = (o) => JSON.parse(JSON.stringify(o));
+    let saved = clone(s);
+    const screenEl = document.getElementById("screen");
+    const theme = () => (screenEl.dataset.screen === "dark" ? "dark" : "light");
+    const sec = document.createElement("section");
+    sec.innerHTML = `
+      <h3>Background <span data-bg-theme></span></h3>
+      <h4>Gradient</h4>
+      <label class="colour">Colour 1 <input type="color" data-bg="a"></label>
+      <label class="colour">Colour 2 <input type="color" data-bg="b"></label>
+      <div class="row seg">
+        <button type="button" data-bg-style="linear">Linear</button>
+        <button type="button" data-bg-style="radial">Radial</button>
+        <button type="button" class="ghost" data-bg-act="swap" title="Swap colour 1 and 2">⇅ Swap</button>
+      </div>
+      <label data-for="linear">Angle <output data-bg-out="angle" data-unit="°"></output>
+        <input type="range" data-bg="angle" min="0" max="360" step="1"></label>
+      <label data-for="radial">Centre across <output data-bg-out="centerX" data-unit="%"></output>
+        <input type="range" data-bg="centerX" min="0" max="100" step="1"></label>
+      <label data-for="radial">Centre down <output data-bg-out="centerY" data-unit="%"></output>
+        <input type="range" data-bg="centerY" min="0" max="100" step="1"></label>
+      <label>Vignette <output data-bg-out="vignette"></output>
+        <input type="range" data-bg="vignette" min="0" max="0.6" step="0.01"></label>
+      <h4>Noise</h4>
+      <label>Amount <output data-bg-out="noise"></output>
+        <small>0 = off</small>
+        <input type="range" data-bg="noise" min="0" max="0.6" step="0.01"></label>
+      <label>Grain size <output data-bg-out="grain" data-unit="px"></output>
+        <input type="range" data-bg="grain" min="1" max="6" step="1"></label>
+      <label>Blend <select data-bg="blend">
+        ${["overlay", "soft-light", "multiply", "screen", "normal"].map((b) => `<option>${b}</option>`).join("")}
+      </select></label>
+      <label class="colour">Colour grain <input type="checkbox" data-bg="colourNoise"></label>
+      <div class="row">
+        <button type="button" data-bg-act="save">Save background</button>
+        <button type="button" class="ghost" data-bg-act="copy">Copy JSON</button>
+      </div>
+      <div class="row">
+        <button type="button" class="ghost" data-bg-act="revert">Revert</button>
+        <button type="button" class="ghost" data-bg-act="defaults">Defaults</button>
+      </div>
+      <p class="status" aria-live="polite"></p>`;
+    panel.prepend(sec); // first, since it's the one you'll play with most
+    panel.setAttribute("aria-label", "Background, cartridge angle and lighting tuner");
+
+    const status = sec.querySelector(".status");
+    const say = (msg, kind = "") => { status.textContent = msg; status.className = "status " + kind; };
+    const dirty = () => JSON.stringify(s) !== JSON.stringify(saved);
+    const sync = () => {
+      const t = theme();
+      sec.querySelector("[data-bg-theme]").textContent = `${t} screen`;
+      sec.querySelectorAll("[data-bg]").forEach((el) => {
+        const k = el.dataset.bg, v = k === "a" || k === "b" ? s[t][k] : s[k];
+        if (el.type === "checkbox") el.checked = !!v; else el.value = v;
+      });
+      sec.querySelectorAll("[data-bg-out]").forEach((el) => {
+        const v = s[el.dataset.bgOut];
+        el.textContent = (el.dataset.unit ? Math.round(v) : v.toFixed(2)) + (el.dataset.unit || "");
+      });
+      sec.querySelectorAll("[data-bg-style]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.bgStyle === s.style));
+      sec.querySelectorAll("[data-for]").forEach((el) => (el.hidden = el.dataset.for !== s.style));
+      sec.querySelector('[data-bg-act="save"]').disabled = !dirty();
+    };
+    const changed = () => { BG.apply(); sync(); say(dirty() ? "Unsaved changes" : ""); };
+    sync();
+    // Re-sync when the theme flips, so the colour pickers show that theme's pair
+    new MutationObserver(sync).observe(screenEl, { attributes: true, attributeFilter: ["data-screen"] });
+
+    sec.addEventListener("input", (e) => {
+      const k = e.target.dataset.bg;
+      if (!k) return;
+      if (k === "a" || k === "b") s[theme()][k] = e.target.value;
+      else if (e.target.type === "checkbox") s[k] = e.target.checked;
+      else if (e.target.type === "range") s[k] = +e.target.value;
+      else s[k] = e.target.value;
+      changed();
+    });
+    sec.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button"); if (!btn) return;
+      if (btn.dataset.bgStyle) { s.style = btn.dataset.bgStyle; changed(); }
+      const act = btn.dataset.bgAct;
+      if (act === "swap") { const t = s[theme()]; [t.a, t.b] = [t.b, t.a]; changed(); }
+      if (act === "revert") { BG.set(clone(saved)); sync(); say("Back to last save"); }
+      if (act === "defaults") { BG.set(clone(BG.DEFAULTS)); sync(); say(dirty() ? "Defaults — not saved yet" : ""); }
+      const json = JSON.stringify(s, null, 2) + "\n";
+      if (act === "copy") {
+        try { await navigator.clipboard.writeText(json); say("Copied — paste into background.json", "ok"); }
+        catch { prompt("Copy this into background.json:", json); }
+      }
+      if (act === "save") {
+        btn.disabled = true; say("Saving…");
+        try {
+          const res = await fetch("/api/commit", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ files: [{ path: "background.json", content: btoa(json) }] }),
+          });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(out.error || `HTTP ${res.status} — is node server.js running?`);
+          saved = clone(s); sync(); say("Saved to background.json", "ok");
         } catch (err) { sync(); say(err.message, "err"); }
       }
     });

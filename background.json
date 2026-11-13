@@ -1,0 +1,19 @@
+{
+  "style": "linear",
+  "angle": 160,
+  "centerX": 50,
+  "centerY": 40,
+  "light": {
+    "a": "#e6e6e8",
+    "b": "#c2c2c6"
+  },
+  "dark": {
+    "a": "#2a2a2e",
+    "b": "#101012"
+  },
+  "noise": 0.12,
+  "grain": 1,
+  "blend": "overlay",
+  "colourNoise": false,
+  "vignette": 0.15
+}
