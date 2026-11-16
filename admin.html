@@ -348,12 +348,17 @@
     if (d) setStatus("Unsaved changes");
   }
 
+  // Starting colours for a cartridge switched to its own background (background.json's defaults)
+  let DEFAULT_BG = { light: { a: "#e6e6e8", b: "#c2c2c6" }, dark: { a: "#2a2a2e", b: "#101012" } };
+  const ownBg = (c) => !!(c.background?.light && c.background?.dark);
+
   async function load() {
     setStatus("Loading…");
     try {
       const json = await backend.readJSON("cartridges.json");
       saved = json.cartridges.map((c) => ({ ...c, id: c.id || slug(c.title), label: c.label || { colors: ["#222222"], fg: "#ffffff" } }));
       data = clone(saved);
+      try { const bg = await backend.readJSON("background.json"); if (bg?.light && bg?.dark) DEFAULT_BG = { light: bg.light, dark: bg.dark }; } catch {}
       uploads.clear();
       render();
       setStatus("");
@@ -410,7 +415,11 @@
     tintFor(c).then((t) => {
       const card = document.querySelector(`.card[data-i="${i}"]`);
       if (!card || data[i] !== c) return;
-      card.querySelector(".preview")?.style.setProperty("--tint", t || "transparent");
+      const pv = card.querySelector(".preview");
+      pv?.style.setProperty("--tint", ownBg(c) ? "transparent" : t || "transparent");
+      // Own background: the light-screen gradient on the left half, dark on the right
+      const g = (t) => `linear-gradient(160deg, ${c.background[t].a}, ${c.background[t].b})`;
+      if (pv) pv.style.background = ownBg(c) ? `${g("light")} left / 50% 100% no-repeat, ${g("dark")} right / 50% 100% no-repeat` : "";
       const sw = card.querySelector(".tint-auto i");
       if (sw) { sw.style.setProperty("--c", t || "transparent"); sw.parentElement.title = t || ""; }
     });
@@ -509,7 +518,27 @@
             </div>
           </div>
 
-          <div class="group-title">Background tint</div>
+          <div class="group-title">Background colours</div>
+          <div class="field wide">
+            <div class="colours">
+              <span class="seg" role="group" aria-label="Background colours">
+                <button type="button" data-act="bg-default" aria-pressed="${!ownBg(c)}">Default</button>
+                <button type="button" data-act="bg-own" aria-pressed="${ownBg(c)}">Own colours</button>
+              </span>
+            </div>
+            <span class="note">${ownBg(c)
+              ? "The launcher fades to this gradient while the cartridge is selected (left of the preview: light screen, right: dark)."
+              : "Uses the default background, washed with the tint below. Change the default with the \` panel on the launcher."}</span>
+          </div>
+          ${ownBg(c) ? ["light", "dark"].map((t) => `
+            <div class="field wide"><span>${t === "light" ? "Light screen" : "Dark screen"}</span>
+              <div class="colours">
+                ${colourInput(`background.${t}.a`, c.background[t].a, `${t} screen colour 1`)}
+                ${colourInput(`background.${t}.b`, c.background[t].b, `${t} screen colour 2`)}
+              </div>
+            </div>`).join("") : ""}
+
+          ${ownBg(c) ? "" : `<div class="group-title">Background tint</div>
           <div class="field wide">
             <div class="colours">
               <span class="seg" role="group" aria-label="Background tint">
@@ -521,7 +550,7 @@
               ${tintMode(c) === "auto" ? `<span class="tint-auto note"><i></i>Picked from the label</span>` : ""}
             </div>
             <span class="note">A light wash of this colour fills the launcher screen while the cartridge is selected.</span>
-          </div>
+          </div>`}
 
           <div class="group-title">Opens</div>
           <label class="field wide"><span>When selected</span>
@@ -602,6 +631,8 @@
     if (act === "gradient" && c.label.colors.length === 1) { c.label.colors = [c.label.colors[0], shade(c.label.colors[0])]; rerenderCard(i); }
     if (act === "label-colour") { delete c.img; delete c._preview; rerenderCard(i); }
     if (act === "label-image" && !c.img && !c._preview) card.querySelector('input[type=file]')?.click();
+    if (act === "bg-own" && !ownBg(c)) { c.background = clone(DEFAULT_BG); rerenderCard(i); }
+    if (act === "bg-default" && ownBg(c)) { delete c.background; rerenderCard(i); }
     if (act === "tint-auto") { delete c.tint; rerenderCard(i); }
     if (act === "tint-none") { c.tint = "none"; rerenderCard(i); }
     if (act === "tint-custom" && tintMode(c) !== "custom") {
@@ -677,6 +708,8 @@
       if (!c.title?.trim()) return `${name}: add a name`;
       if (c.shell && !HEX.test(c.shell)) return `${name}: shell colour isn't a valid #rrggbb`;
       if (c.tint && c.tint !== "none" && !HEX.test(c.tint)) return `${name}: background tint isn't a valid #rrggbb`;
+      if (c.background && !["light", "dark"].every((t) => HEX.test(c.background[t]?.a || "") && HEX.test(c.background[t]?.b || "")))
+        return `${name}: background colours need to be valid #rrggbb`;
       if (opensOf(c) === "protected") {
         if (!c.protected && !c._password) return `${name}: set a password`;
         if (c._password && c._password.length < 8) return `${name}: use a password of at least 8 characters`;
