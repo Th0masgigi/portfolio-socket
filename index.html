@@ -21,6 +21,11 @@
   @property --tint { syntax: "<color>"; inherits: true; initial-value: #808080; }
   @property --tint-on { syntax: "<number>"; inherits: true; initial-value: 0; }
   @property --wash { syntax: "<percentage>"; inherits: true; initial-value: 12%; }
+  /* …and so the gradient fades when you move to a project with its own colours */
+  @property --bg-a-light { syntax: "<color>"; inherits: true; initial-value: #e6e6e8; }
+  @property --bg-b-light { syntax: "<color>"; inherits: true; initial-value: #c2c2c6; }
+  @property --bg-a-dark { syntax: "<color>"; inherits: true; initial-value: #2a2a2e; }
+  @property --bg-b-dark { syntax: "<color>"; inherits: true; initial-value: #101012; }
   :root {
     --bezel: #050505;
     --pill-bg: #111;
@@ -89,7 +94,8 @@
     background-color: var(--screen-tinted);
     display: grid;
     grid-template-rows: auto 1fr auto;
-    transition: --tint .6s ease, --tint-on .6s ease, --wash .4s ease;
+    transition: --tint .6s ease, --tint-on .6s ease, --wash .4s ease,
+      --bg-a-light .6s ease, --bg-b-light .6s ease, --bg-a-dark .6s ease, --bg-b-dark .6s ease;
     user-select: none; -webkit-user-select: none;
   }
 
@@ -393,7 +399,7 @@
   /* ---------- Angle tuner (local-only admin panel) ---------- */
   .tuner {
     position: fixed; right: 16px; top: 64px; z-index: 60;
-    width: 260px; padding: 14px;
+    width: 300px; padding: 14px;
     background: rgba(17,17,17,.92); color: #f2f2f2;
     border: 1px solid rgba(255,255,255,.12); border-radius: 10px;
     font: 12px/1.4 var(--mono);
@@ -405,6 +411,18 @@
   .tuner select { background: #222; color: #f2f2f2; border: 1px solid rgba(255,255,255,.25); border-radius: 5px; font: inherit; padding: 2px 4px; }
   .tuner input[type=checkbox] { accent-color: #7ef29a; width: 16px; height: 16px; }
   .tuner .row button[aria-pressed=true] { background: #7ef29a; color: #111; }
+  .tuner .pair { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 6px; border-radius: 6px; }
+  .tuner .pair.live { background: rgba(126,242,154,.1); } /* the screen currently showing */
+  .tuner .pair-name { opacity: .8; }
+  .tuner .swatch { display: grid; justify-items: center; gap: 2px; margin: 0; grid-template-columns: none; }
+  .tuner .swatch code { font-size: 10px; opacity: .7; }
+  .tuner input[type=color]:disabled { opacity: .45; cursor: default; }
+  .tuner .proj { margin: 0 -6px 12px; padding: 0 6px 6px; }
+  .tuner .nav { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+  .tuner .nav b { flex: 1; font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tuner .nav button { width: 20px; height: 20px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); color: #f2f2f2; line-height: 1; }
+  .tuner .note { font-size: 11px; opacity: .65; margin: 2px 0 6px; }
+  .tuner .note.edited { color: #ffd479; opacity: 1; }
   .tuner .row button[aria-pressed=false] { background: transparent; color: #f2f2f2; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
   .tuner section + section { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
   .tuner h4 { font-size: 11px; font-weight: 500; opacity: .55; letter-spacing: .04em; text-transform: uppercase; margin: 12px 0 8px; }
@@ -421,9 +439,10 @@
   .tuner output { font-variant-numeric: tabular-nums; }
   .tuner .row { display: flex; gap: 6px; margin-top: 4px; }
   .tuner .row button {
-    flex: 1; height: 28px; border-radius: 6px;
+    flex: 1; height: 28px; border-radius: 6px; padding: 0 6px; white-space: nowrap;
     background: #f2f2f2; color: #111; font-size: 12px; font-weight: 500;
   }
+  .tuner .row button:disabled { opacity: .45; cursor: default; }
   .tuner .row button.ghost { background: transparent; color: #f2f2f2; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
 
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -506,6 +525,8 @@
       vignette: 0.15,       // 0–1 darkening at the edges
     };
     const settings = JSON.parse(JSON.stringify(DEFAULTS));
+    // The selected cartridge's own colours ({ light: {a, b}, dark: {a, b} }), or null = use the defaults
+    let project = null;
     let tileKey = "";
     function noiseTile(colour) {
       const S = 128, cv = document.createElement("canvas"); cv.width = cv.height = S;
@@ -519,9 +540,9 @@
       return cv.toDataURL("image/png");
     }
     function apply() {
-      const s = settings, st = screen.style;
-      st.setProperty("--bg-a-light", s.light.a); st.setProperty("--bg-b-light", s.light.b);
-      st.setProperty("--bg-a-dark", s.dark.a); st.setProperty("--bg-b-dark", s.dark.b);
+      const s = settings, st = screen.style, c = project || s;
+      st.setProperty("--bg-a-light", c.light.a); st.setProperty("--bg-b-light", c.light.b);
+      st.setProperty("--bg-a-dark", c.dark.a); st.setProperty("--bg-b-dark", c.dark.b);
       st.setProperty("--bg-gradient", s.style === "radial"
         ? `radial-gradient(circle at ${s.centerX}% ${s.centerY}%, var(--a-tinted), var(--b-tinted) 85%)`
         : `linear-gradient(${s.angle}deg, var(--a-tinted), var(--b-tinted))`);
@@ -542,7 +563,13 @@
     const ready = fetch("background.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
       .then((o) => { merge(o); apply(); return settings; });
-    return { settings, DEFAULTS, apply, ready, set: (o) => { merge(o); apply(); } };
+    const HEX = /^#[0-9a-f]{6}$/i;
+    const valid = (b) => !!b && ["light", "dark"].every((t) => HEX.test(b[t]?.a || "") && HEX.test(b[t]?.b || ""));
+    return {
+      settings, DEFAULTS, apply, ready, valid,
+      set: (o) => { merge(o); apply(); },
+      setProject: (bg) => { project = valid(bg) ? bg : null; apply(); },
+    };
   })();
 
   /* ---------- Content ----------
@@ -637,10 +664,13 @@
   const tints = PROJECTS.map(tintFor);
   function applyTint() {
     const i = index;
+    // A cartridge with its own background colours shows them as-is, without the tint wash
+    const own = window.BG.valid(PROJECTS[i].background);
+    window.BG.setProject(own ? PROJECTS[i].background : null);
     tints[i].then((t) => {
       if (i !== index) return; // moved on before an image tint finished
       if (t) screen.style.setProperty("--tint", t);
-      screen.style.setProperty("--tint-on", t ? 1 : 0);
+      screen.style.setProperty("--tint-on", t && !own ? 1 : 0);
     });
   }
 
@@ -688,6 +718,7 @@
     setTimeout(() => { captionText.textContent = PROJECTS[index].title; caption.classList.remove("swap"); }, 140);
     try { sessionStorage.setItem("cart", index); } catch (e) {}
     applyTint();
+    screen.dispatchEvent(new CustomEvent("cartchange", { detail: { index } }));
   }
 
   function go(i) {
@@ -831,7 +862,7 @@
 
   addEventListener("resize", render);
   render();
-  return { PROJECTS, slots };
+  return { PROJECTS, slots, current: () => index, refresh: applyTint };
   })();
 
   /* ---------- Loader ----------
@@ -1270,25 +1301,61 @@
   }
 
   /* ---------- Background tuner ----------
-     Same panel. Edits preview live; colours are per screen theme (the Y key or the
-     Dark/Light screen button switches which pair you're editing). "Save background"
-     writes background.json through server.js; "Copy JSON" works anywhere. */
+     Top of the panel. Two parts:
+     - "This project": follows the carousel. Shows the light- and dark-screen colours the
+       selected cartridge will be saved with (its own, or the defaults). Edits are kept per
+       project as you move around; "Save projects" writes them all to cartridges.json.
+     - "Default background": the colours every other cartridge uses, plus the gradient
+       shape and noise, which all cartridges share. "Save default" writes background.json.
+     Saving needs node server.js; on the live site, the Copy buttons give you the JSON. */
   async function setupBackgroundTuner(panel) {
     const BG = window.BG, s = await BG.ready;
+    const L = await window.LAUNCHER_READY;
     const clone = (o) => JSON.parse(JSON.stringify(o));
+    const utf8B64 = (str) => { let bin = ""; new TextEncoder().encode(str).forEach((b) => (bin += String.fromCharCode(b))); return btoa(bin); };
     let saved = clone(s);
+    // What each cartridge has on disk (for "edited" markers and Revert)
+    const savedProject = L.PROJECTS.map((p) => (BG.valid(p.background) ? clone(p.background) : null));
     const screenEl = document.getElementById("screen");
     const theme = () => (screenEl.dataset.screen === "dark" ? "dark" : "light");
+    const setTheme = (t) => { if (theme() !== t) document.getElementById("btn-theme").click(); };
+
+    const pickers = (attr) => ["light", "dark"].map((t) => `
+      <div class="pair" data-theme-pair="${t}">
+        <span class="pair-name">${t === "light" ? "Light screen" : "Dark screen"}</span>
+        ${["a", "b"].map((k) => `
+          <label class="swatch" title="${t} colour ${k === "a" ? 1 : 2}">
+            <input type="color" ${attr}="${t}.${k}"><code data-hex="${attr}:${t}.${k}"></code>
+          </label>`).join("")}
+      </div>`).join("");
+
     const sec = document.createElement("section");
     sec.innerHTML = `
-      <h3>Background <span data-bg-theme></span></h3>
-      <h4>Gradient</h4>
-      <label class="colour">Colour 1 <input type="color" data-bg="a"></label>
-      <label class="colour">Colour 2 <input type="color" data-bg="b"></label>
+      <h3>Background <span>\` to hide</span></h3>
+
+      <div class="proj">
+        <h4>This project</h4>
+        <div class="nav"><button type="button" data-bg-act="prev" aria-label="Previous project">‹</button><b data-proj-name></b><button type="button" data-bg-act="next" aria-label="Next project">›</button></div>
+        <div class="row seg">
+          <button type="button" data-proj-mode="default">Use default</button>
+          <button type="button" data-proj-mode="custom">Own colours</button>
+        </div>
+        ${pickers("data-proj")}
+        <p class="note" data-proj-note></p>
+        <div class="row">
+          <button type="button" data-bg-act="save-projects">Save projects</button>
+          <button type="button" class="ghost" data-bg-act="revert-project">Revert</button>
+        </div>
+        <div class="row"><button type="button" class="ghost" data-bg-act="copy-project">Copy JSON</button></div>
+        <p class="status" data-status="proj" aria-live="polite"></p>
+      </div>
+
+      <h4>Default background</h4>
+      ${pickers("data-def")}
       <div class="row seg">
         <button type="button" data-bg-style="linear">Linear</button>
         <button type="button" data-bg-style="radial">Radial</button>
-        <button type="button" class="ghost" data-bg-act="swap" title="Swap colour 1 and 2">⇅ Swap</button>
+        <button type="button" class="ghost" data-bg-act="swap" title="Swap colour 1 and 2 (both screens, this project or the default)">⇅ Swap</button>
       </div>
       <label data-for="linear">Angle <output data-bg-out="angle" data-unit="°"></output>
         <input type="range" data-bg="angle" min="0" max="360" step="1"></label>
@@ -1309,25 +1376,50 @@
       </select></label>
       <label class="colour">Colour grain <input type="checkbox" data-bg="colourNoise"></label>
       <div class="row">
-        <button type="button" data-bg-act="save">Save background</button>
+        <button type="button" data-bg-act="save">Save default</button>
         <button type="button" class="ghost" data-bg-act="copy">Copy JSON</button>
       </div>
       <div class="row">
         <button type="button" class="ghost" data-bg-act="revert">Revert</button>
-        <button type="button" class="ghost" data-bg-act="defaults">Defaults</button>
+        <button type="button" class="ghost" data-bg-act="defaults">Factory defaults</button>
       </div>
-      <p class="status" aria-live="polite"></p>`;
-    panel.prepend(sec); // first, since it's the one you'll play with most
+      <p class="status" data-status="def" aria-live="polite"></p>`;
+    // Take over the angle panel's "` to hide" hint, since this is now the top section
+    panel.querySelector("h3 span")?.remove();
+    panel.prepend(sec);
     panel.setAttribute("aria-label", "Background, cartridge angle and lighting tuner");
 
-    const status = sec.querySelector(".status");
-    const say = (msg, kind = "") => { status.textContent = msg; status.className = "status " + kind; };
-    const dirty = () => JSON.stringify(s) !== JSON.stringify(saved);
-    const sync = () => {
-      const t = theme();
-      sec.querySelector("[data-bg-theme]").textContent = `${t} screen`;
+    const say = (which, msg, kind = "") => { const el = sec.querySelector(`[data-status="${which}"]`); el.textContent = msg; el.className = "status " + kind; };
+    const cur = () => L.current();
+    const proj = () => L.PROJECTS[cur()];
+    const own = (i = cur()) => (BG.valid(L.PROJECTS[i].background) ? L.PROJECTS[i].background : null);
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const editedProjects = () => L.PROJECTS.map((_, i) => i).filter((i) => !same(own(i), savedProject[i]));
+    const defDirty = () => !same(s, saved);
+    const get = (obj, path) => path.split(".").reduce((o, k) => o[k], obj);
+    const put = (obj, path, v) => { const [t, k] = path.split("."); obj[t][k] = v; };
+
+    function sync() {
+      const i = cur(), p = proj(), mine = own(), shown = mine || s;
+      sec.querySelector("[data-proj-name]").textContent = `${p.title} · ${i + 1}/${L.PROJECTS.length}`;
+      sec.querySelectorAll("[data-proj-mode]").forEach((b) => b.setAttribute("aria-pressed", (b.dataset.projMode === "custom") === !!mine));
+      sec.querySelectorAll("[data-proj]").forEach((el) => { el.value = get(shown, el.dataset.proj); el.disabled = !mine; });
+      sec.querySelectorAll("[data-def]").forEach((el) => (el.value = get(s, el.dataset.def)));
+      sec.querySelectorAll("[data-hex]").forEach((el) => {
+        const [attr, path] = el.dataset.hex.split(":");
+        el.textContent = get(attr === "data-proj" ? shown : s, path);
+      });
+      sec.querySelectorAll("[data-theme-pair]").forEach((el) => el.classList.toggle("live", el.dataset.themePair === theme()));
+      const edited = !same(mine, savedProject[i]);
+      sec.querySelector("[data-proj-note]").textContent =
+        (mine ? "Saved with its own colours" : "Saved with the default colours (and its label tint)") +
+        (edited ? " — edited, not saved yet" : "");
+      sec.querySelector("[data-proj-note]").classList.toggle("edited", edited);
+      const n = editedProjects().length;
+      const sp = sec.querySelector('[data-bg-act="save-projects"]');
+      sp.textContent = n ? `Save projects (${n})` : "Save projects"; sp.disabled = !n;
       sec.querySelectorAll("[data-bg]").forEach((el) => {
-        const k = el.dataset.bg, v = k === "a" || k === "b" ? s[t][k] : s[k];
+        const v = s[el.dataset.bg];
         if (el.type === "checkbox") el.checked = !!v; else el.value = v;
       });
       sec.querySelectorAll("[data-bg-out]").forEach((el) => {
@@ -1336,45 +1428,96 @@
       });
       sec.querySelectorAll("[data-bg-style]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.bgStyle === s.style));
       sec.querySelectorAll("[data-for]").forEach((el) => (el.hidden = el.dataset.for !== s.style));
-      sec.querySelector('[data-bg-act="save"]').disabled = !dirty();
-    };
-    const changed = () => { BG.apply(); sync(); say(dirty() ? "Unsaved changes" : ""); };
+      sec.querySelector('[data-bg-act="save"]').disabled = !defDirty();
+    }
+    const changedProject = () => { L.refresh(); sync(); say("proj", ""); };
+    const changedDefault = () => { BG.apply(); sync(); say("def", defDirty() ? "Unsaved changes" : ""); };
     sync();
-    // Re-sync when the theme flips, so the colour pickers show that theme's pair
+    screenEl.addEventListener("cartchange", sync);
     new MutationObserver(sync).observe(screenEl, { attributes: true, attributeFilter: ["data-screen"] });
 
     sec.addEventListener("input", (e) => {
-      const k = e.target.dataset.bg;
-      if (!k) return;
-      if (k === "a" || k === "b") s[theme()][k] = e.target.value;
-      else if (e.target.type === "checkbox") s[k] = e.target.checked;
-      else if (e.target.type === "range") s[k] = +e.target.value;
-      else s[k] = e.target.value;
-      changed();
+      const el = e.target;
+      if (el.dataset.proj) {
+        const mine = own(); if (!mine) return;
+        put(mine, el.dataset.proj, el.value);
+        setTheme(el.dataset.proj.split(".")[0]); // show the screen you're editing
+        changedProject();
+      } else if (el.dataset.def) {
+        put(s, el.dataset.def, el.value);
+        setTheme(el.dataset.def.split(".")[0]);
+        changedDefault();
+      } else if (el.dataset.bg) {
+        const k = el.dataset.bg;
+        s[k] = el.type === "checkbox" ? el.checked : el.type === "range" ? +el.value : el.value;
+        changedDefault();
+      }
     });
     sec.addEventListener("click", async (e) => {
       const btn = e.target.closest("button"); if (!btn) return;
-      if (btn.dataset.bgStyle) { s.style = btn.dataset.bgStyle; changed(); }
+      const p = proj(), i = cur();
+      if (btn.dataset.projMode === "custom" && !own()) { p.background = clone({ light: s.light, dark: s.dark }); changedProject(); }
+      if (btn.dataset.projMode === "default" && own()) { delete p.background; changedProject(); }
+      if (btn.dataset.bgStyle) { s.style = btn.dataset.bgStyle; changedDefault(); }
       const act = btn.dataset.bgAct;
-      if (act === "swap") { const t = s[theme()]; [t.a, t.b] = [t.b, t.a]; changed(); }
-      if (act === "revert") { BG.set(clone(saved)); sync(); say("Back to last save"); }
-      if (act === "defaults") { BG.set(clone(BG.DEFAULTS)); sync(); say(dirty() ? "Defaults — not saved yet" : ""); }
+      if (act === "prev" || act === "next") {
+        // Same keys the launcher uses, so the carousel moves with it
+        dispatchEvent(new KeyboardEvent("keydown", { key: act === "prev" ? "ArrowLeft" : "ArrowRight" }));
+      }
+      if (act === "swap") {
+        const target = own() || s;
+        for (const t of ["light", "dark"]) [target[t].a, target[t].b] = [target[t].b, target[t].a];
+        own() ? changedProject() : changedDefault();
+      }
+      if (act === "revert-project") {
+        if (savedProject[i]) p.background = clone(savedProject[i]); else delete p.background;
+        changedProject(); say("proj", "Back to last save");
+      }
+      if (act === "copy-project") {
+        const json = JSON.stringify(own() ? { background: own() } : {}, null, 2);
+        try { await navigator.clipboard.writeText(json); say("proj", `Copied — paste into “${p.title}” in cartridges.json`, "ok"); }
+        catch { prompt(`Copy into “${p.title}” in cartridges.json:`, json); }
+      }
+      if (act === "save-projects") {
+        btn.disabled = true; say("proj", "Saving…");
+        try {
+          // Start from the file on disk so nothing else in it changes
+          const file = await (await fetch("cartridges.json", { cache: "no-store" })).json();
+          const list = editedProjects();
+          for (const j of list) {
+            const entry = file.cartridges[j];
+            if (!entry || entry.title !== L.PROJECTS[j].title) throw new Error("cartridges.json changed since this page loaded — reload and try again");
+            if (own(j)) entry.background = clone(own(j)); else delete entry.background;
+          }
+          const json = JSON.stringify(file, null, 2) + "\n";
+          const res = await fetch("/api/commit", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ files: [{ path: "cartridges.json", content: utf8B64(json) }] }),
+          });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(out.error || `HTTP ${res.status} — is node server.js running? (Copy JSON works on the live site)`);
+          list.forEach((j) => (savedProject[j] = own(j) ? clone(own(j)) : null));
+          sync(); say("proj", `Saved ${list.length} project${list.length > 1 ? "s" : ""} to cartridges.json`, "ok");
+        } catch (err) { sync(); say("proj", err.message, "err"); }
+      }
+      if (act === "revert") { BG.set(clone(saved)); L.refresh(); sync(); say("def", "Back to last save"); }
+      if (act === "defaults") { BG.set(clone(BG.DEFAULTS)); L.refresh(); sync(); say("def", defDirty() ? "Factory defaults — not saved yet" : ""); }
       const json = JSON.stringify(s, null, 2) + "\n";
       if (act === "copy") {
-        try { await navigator.clipboard.writeText(json); say("Copied — paste into background.json", "ok"); }
+        try { await navigator.clipboard.writeText(json); say("def", "Copied — paste into background.json", "ok"); }
         catch { prompt("Copy this into background.json:", json); }
       }
       if (act === "save") {
-        btn.disabled = true; say("Saving…");
+        btn.disabled = true; say("def", "Saving…");
         try {
           const res = await fetch("/api/commit", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ files: [{ path: "background.json", content: btoa(json) }] }),
+            body: JSON.stringify({ files: [{ path: "background.json", content: utf8B64(json) }] }),
           });
           const out = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(out.error || `HTTP ${res.status} — is node server.js running?`);
-          saved = clone(s); sync(); say("Saved to background.json", "ok");
-        } catch (err) { sync(); say(err.message, "err"); }
+          if (!res.ok) throw new Error(out.error || `HTTP ${res.status} — is node server.js running? (Copy JSON works on the live site)`);
+          saved = clone(s); sync(); say("def", "Saved to background.json", "ok");
+        } catch (err) { sync(); say("def", err.message, "err"); }
       }
     });
   }
